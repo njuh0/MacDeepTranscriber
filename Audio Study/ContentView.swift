@@ -85,7 +85,7 @@ struct ContentView: View {
                                     .foregroundColor(.secondary)
                             }
                             
-                            Slider(value: $audioCaptureService.whisperTranscriptionInterval, in: 5.0...30.0, step: 1) {
+                            Slider(value: $audioCaptureService.whisperTranscriptionInterval, in: 0.1...30.0, step: 0.1) {
                                 Text("Transcription Interval")
                             } onEditingChanged: { editing in
                                 if !editing {
@@ -111,7 +111,7 @@ struct ContentView: View {
                                     .foregroundColor(.secondary)
                             }
                             
-                            Slider(value: $audioCaptureService.whisperMaxBufferDuration, in: 60.0...300.0, step: 30.0) {
+                            Slider(value: $audioCaptureService.whisperMaxBufferDuration, in: 10.0...300.0, step: 10.0) {
                                 Text("Max Buffer Duration")
                             } onEditingChanged: { editing in
                                 if !editing {
@@ -178,7 +178,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .frame(minHeight: 200, maxHeight: 400)
+            .frame(height: 100)
             .background(Color(NSColor.textBackgroundColor))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -191,7 +191,7 @@ struct ContentView: View {
             if audioCaptureService.selectedEngine == .whisperKit {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Archived Text (Buffer Resets)")
+                        Text("Full transcription")
                             .font(.headline)
                             .foregroundColor(.orange)
                         Spacer()
@@ -223,7 +223,7 @@ struct ContentView: View {
                             Spacer(minLength: 0)
                         }
                     }
-                    .frame(maxHeight: 150)
+                    .frame(maxHeight: 400)
                     .background(Color(NSColor.controlBackgroundColor))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)

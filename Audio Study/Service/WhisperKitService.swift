@@ -528,13 +528,9 @@ extension WhisperKitService {
     static func availableModels() -> [String] {
         return [
             "tiny",
-            "tiny.en",
             "base",
-            "base.en",
             "small",
-            "small.en",
             "medium",
-            "medium.en",
             "large-v2",
             "large-v3"
         ]
@@ -543,13 +539,13 @@ extension WhisperKitService {
     /// Returns model size information
     static func modelInfo(for modelName: String) -> (size: String, description: String) {
         switch modelName {
-        case "tiny", "tiny.en":
+        case "tiny":
             return ("150-200 MB", "Fastest, least accurate")
-        case "base", "base.en":
+        case "base":
             return ("290-350 MB", "Good balance of speed and accuracy")
-        case "small", "small.en":
+        case "small":
             return ("970 MB - 1.2 GB", "Better accuracy, slower")
-        case "medium", "medium.en":
+        case "medium":
             return ("2.3 - 2.8 GB", "High accuracy, much slower")
         case "large-v2", "large-v3":
             return ("4.5 - 5.5 GB", "Best accuracy, very slow")
