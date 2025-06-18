@@ -55,6 +55,7 @@ class WhisperKitService: ObservableObject {
     private var accumulatedText: String = ""
     private var lastProcessedBufferCount: Int = 0
     private var lastTranscriptionLength: Int = 0  // Track length of last transcription to detect new content
+    private var lastContextTranscription: String = ""  // Store last context transcription for comparison
     
     // WhisperKit instance (will be uncommented when package is added)
     private var whisperKit: WhisperKit?
@@ -181,6 +182,7 @@ class WhisperKitService: ObservableObject {
         accumulatedText = ""
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
+        lastContextTranscription = ""
         
         // Start periodic transcription
         startPeriodicTranscription()
@@ -226,6 +228,7 @@ class WhisperKitService: ObservableObject {
         accumulatedText = ""
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
+        lastContextTranscription = ""
         
         print("WhisperKit recognition stopped")
     }
@@ -315,29 +318,34 @@ class WhisperKitService: ObservableObject {
             // Transcribe using WhisperKit
             let transcription = try await transcribeAudioData(audioData)
             
-            // Update UI on main thread - use context-based transcription with smart accumulation
+            // Update UI on main thread - use smart transcription replacement
             self.isProcessing = false
             if !transcription.isEmpty {
-                // Сохраняем предыдущий накопленный текст для сравнения
                 let previousAccumulated = accumulatedText
                 
-                // Используем полную транскрипцию с контекстом (это исправленная версия)
+                // Use the current transcription as the new accumulated text
+                // WhisperKit's context windows provide the best available transcription
                 accumulatedText = transcription
                 
-                // Если новая транскрипция значительно короче предыдущей накопленной,
-                // это может означать потерю контекста - добавляем к предыдущему тексту
-                if !previousAccumulated.isEmpty && transcription.count < Int(Double(previousAccumulated.count) * 0.7) {
-                    // Проверяем, не является ли новая транскрипция частью предыдущей
-                    if !previousAccumulated.lowercased().contains(transcription.lowercased()) {
-                        accumulatedText = previousAccumulated + " " + transcription
-                        print("🎵 Added to previous text (context lost): \(transcription)")
-                    } else {
-                        // Новая транскрипция уже содержится в предыдущей, используем предыдущую
+                // Only preserve previous text if current transcription is significantly shorter
+                // and appears to be missing substantial content (likely a processing error)
+                if !previousAccumulated.isEmpty &&
+                   transcription.count < Int(Double(previousAccumulated.count) * 0.6) &&
+                   previousAccumulated.count > 100 {
+                    
+                    // Check if current transcription seems to be a truncated version
+                    let cleanPrevious = previousAccumulated.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    let cleanCurrent = transcription.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // If current is contained in previous and much shorter, keep previous
+                    if cleanPrevious.contains(cleanCurrent) && cleanCurrent.count < Int(Double(cleanPrevious.count) * 0.8) {
                         accumulatedText = previousAccumulated
-                        print("🎵 Keeping previous text (no new content): \(transcription)")
+                        print("🎵 Keeping previous transcription (current seems truncated): \(previousAccumulated.count) chars vs \(transcription.count) chars")
+                    } else {
+                        print("🎵 Using new transcription: \(accumulatedText)")
                     }
                 } else {
-                    print("🎵 Full context transcription (corrected): \(accumulatedText)")
+                    print("🎵 Full context transcription: \(accumulatedText)")
                 }
                 
                 self.onRecognitionResult?(accumulatedText)
@@ -492,6 +500,7 @@ class WhisperKitService: ObservableObject {
         
         return resampledData
     }
+    
     
     
 }
