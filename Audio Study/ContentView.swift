@@ -187,6 +187,53 @@ struct ContentView: View {
             .padding(.horizontal)
             .padding(.bottom)
             
+            // Archived text section (only show when WhisperKit is selected)
+            if audioCaptureService.selectedEngine == .whisperKit {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Archived Text (Buffer Resets)")
+                            .font(.headline)
+                            .foregroundColor(.orange)
+                        Spacer()
+                        Button("Clear Archived") {
+                            audioCaptureService.clearArchivedText()
+                        }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.orange)
+                        .disabled(audioCaptureService.archivedText.isEmpty)
+                    }
+                    
+                    ScrollView(.vertical, showsIndicators: true) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if audioCaptureService.archivedText.isEmpty {
+                                Text("Archived text from buffer resets will appear here...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(8)
+                            } else {
+                                Text(audioCaptureService.archivedText)
+                                    .font(.caption)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .foregroundColor(.secondary)
+                                    .textSelection(.enabled)
+                                    .padding(8)
+                            }
+                            
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .frame(maxHeight: 150)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.orange, lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
+            
             // Clear text button
             if !audioCaptureService.recognizedText.isEmpty {
                 HStack {
@@ -286,7 +333,7 @@ struct ContentView: View {
             }
             .padding(.horizontal)
         }
-        .frame(minWidth: 400, minHeight: 750) // Increased height for WhisperKit settings
+        .frame(minWidth: 500, minHeight: 1000) // Increased height for WhisperKit settings
     }
 }
 

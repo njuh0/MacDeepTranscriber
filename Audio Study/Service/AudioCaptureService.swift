@@ -9,6 +9,7 @@ class AudioCaptureService: ObservableObject {
     @Published var isCapturing: Bool = false
     @Published var errorMessage: String?
     @Published var recognizedText: String = ""
+    @Published var archivedText: String = ""  // Store archived text from buffer resets
     @Published var isSpeechRecognitionAvailable: Bool = false
     @Published var isMicrophoneAccessGranted: Bool = false
     @Published var selectedEngine: SpeechEngineType = .appleSpeech
@@ -128,6 +129,13 @@ class AudioCaptureService: ObservableObject {
                 }
             }
         }
+        whisperKitService.onArchivedTextUpdate = { [weak self] text in
+            DispatchQueue.main.async {
+                if self?.selectedEngine == .whisperKit {
+                    self?.archivedText = text
+                }
+            }
+        }
     }
     
     private func updateAvailability() {
@@ -191,6 +199,11 @@ class AudioCaptureService: ObservableObject {
     func clearRecognizedText() {
         recognizedText = ""
         statusMessage = "Transcription text cleared."
+    }
+    
+    func clearArchivedText() {
+        archivedText = ""
+        statusMessage = "Archived text cleared."
     }
 
     func startCapture() {
