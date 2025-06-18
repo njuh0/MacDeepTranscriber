@@ -476,7 +476,7 @@ class WhisperKitService: ObservableObject {
             print("🎵 Processing audio: \(processedAudio.count) samples at \(targetSampleRate)Hz")
             
             // Transcribe using WhisperKit with audioArray method
-            let results = try await whisperKit.transcribe(audioArray: processedAudio)
+            let results = try await whisperKit.transcribe(audioArray: processedAudio, decodeOptions: DecodingOptions(task: .transcribe, language: "ru"))
             
             // Extract text from first result (WhisperKit returns [TranscriptionResult])
             let transcription = results.first?.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) ?? ""

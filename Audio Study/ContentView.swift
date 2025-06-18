@@ -257,7 +257,6 @@ struct ContentView: View {
                         ? "Stop Capture" : "Start Capture"
                 )
                 .font(.title2)
-                .padding()
                 .cornerRadius(10)
             }
             .disabled(
@@ -265,22 +264,26 @@ struct ContentView: View {
                     || !audioCaptureService.isMicrophoneAccessGranted
                     || !audioCaptureService.isModelLoaded
             )
-        }
-        .padding()
-        .frame(width: 200, height: 600)
+        }.padding()
         if let error = audioCaptureService.errorMessage {
-            Text("Error: \(error)")
-                .foregroundColor(.red)
-                .padding()
+            VStack {
+                Text("Error: \(error)")
+                    .foregroundColor(.red)
+                    .padding()
+                Spacer(minLength: 30)
+            }
         }
-
+        Spacer(minLength: 30)
         // Increased height for WhisperKit settings
 
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
+//struct ContentView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        ContentView()
+//    }
+//}
+#Preview {
+    ContentView()
 }
