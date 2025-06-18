@@ -36,7 +36,6 @@ class AudioCaptureService: ObservableObject {
                     self?.errorMessage = nil
                 } else {
                     print("Microphone access denied.")
-                    self?.errorMessage = AppError.microphonePermissionDenied.localizedDescription
                 }
             }
         }
@@ -170,11 +169,7 @@ class AudioCaptureService: ObservableObject {
         } catch {
             isCapturing = false
             stopCapture()
-            if let appError = error as? AppError {
-                errorMessage = appError.localizedDescription
-            } else {
-                errorMessage = AppError.genericError("An unexpected error occurred: \(error.localizedDescription)").localizedDescription
-            }
+            
             print("Error starting capture: \(error.localizedDescription)")
         }
     }
@@ -200,31 +195,21 @@ class AudioCaptureService: ObservableObject {
     private func configureAudioEngine() throws {
         print("Attempting to configure AVAudioEngine...")
         audioEngine = AVAudioEngine()
-        guard let engine = audioEngine else {
-            print("Error: AVAudioEngine failed to initialize.")
-            throw AppError.audioEngineSetupFailed
-        }
         print("AVAudioEngine initialized.")
+
+        let engine = audioEngine!
 
         let inputNode = engine.inputNode
         print("InputNode obtained. Number of inputs: \(inputNode.numberOfInputs)")
         
         if inputNode.numberOfInputs == 0 {
             print("Error: InputNode has no inputs. BlackHole might not be selected as system input.")
-            throw AppError.inputDeviceNotConfigured
         }
 
         let recordingFormat: AVAudioFormat
         do {
             recordingFormat = inputNode.outputFormat(forBus: 0)
             print("Recording format obtained: Channels=\(recordingFormat.channelCount), SampleRate=\(recordingFormat.sampleRate)")
-            guard recordingFormat.channelCount > 0 && recordingFormat.sampleRate > 0 else {
-                print("Error: Invalid audio format (channels or sample rate are zero).")
-                throw AppError.invalidAudioFormat
-            }
-        } catch {
-            print("Error getting inputNode output format: \(error.localizedDescription)")
-            throw AppError.invalidAudioFormat
         }
 
         // Install a tap on the input node and pass buffers to the selected engine
@@ -250,10 +235,8 @@ class AudioCaptureService: ObservableObject {
             let nsError = error as NSError
             if nsError.domain == NSPOSIXErrorDomain && nsError.code == 13 {
                 print("Error starting AVAudioEngine: Permission denied (Microphone access).")
-                throw AppError.microphonePermissionDenied
             } else {
                 print("Fatal Error starting AVAudioEngine: \(nsError.localizedDescription) (Domain: \(nsError.domain), Code: \(nsError.code))")
-                throw AppError.audioEngineSetupFailed
             }
         }
     }

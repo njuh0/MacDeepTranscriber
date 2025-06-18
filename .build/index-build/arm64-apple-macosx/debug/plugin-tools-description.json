@@ -1121,10 +1121,6 @@
         },
         {
           "kind" : "file",
-          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechRecognizerService.swift"
-        },
-        {
-          "kind" : "file",
           "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift"
         },
         {
@@ -1147,7 +1143,6 @@
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/Audio_StudyApp.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/ContentView.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.swift.o",
-        "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechRecognizerService.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/WhisperKitService.swift.o"
       ],
       "otherArguments" : [
@@ -1216,7 +1211,6 @@
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Audio_StudyApp.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/ContentView.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift",
-        "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechRecognizerService.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift"
       ],
       "tempsPath" : "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build",
@@ -6120,7 +6114,6 @@
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Audio_StudyApp.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/ContentView.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift",
-      "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechRecognizerService.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift",
       "-I",
       "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Modules",
@@ -8415,10 +8408,6 @@
         {
           "kind" : "file",
           "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift"
-        },
-        {
-          "kind" : "file",
-          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechRecognizerService.swift"
         },
         {
           "kind" : "file",
