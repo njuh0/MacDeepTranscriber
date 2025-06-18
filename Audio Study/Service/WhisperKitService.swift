@@ -258,8 +258,8 @@ class WhisperKitService: ObservableObject {
         bufferLock.unlock()
         
         // Используем перекрывающиеся сегменты для лучшего качества
-        // Берем последние 45 секунд для контекста
-        let contextDuration: TimeInterval = 45.0
+        // Берем весь доступный контекст до максимального размера буфера
+        let contextDuration: TimeInterval = maxBufferDuration
         let totalDuration = allBuffers.reduce(0.0) { total, buffer in
             return total + Double(buffer.frameLength) / buffer.format.sampleRate
         }
@@ -270,7 +270,7 @@ class WhisperKitService: ObservableObject {
             buffersToProcess = allBuffers
             print("🔄 Processing entire session: \(String(format: "%.1f", totalDuration))s (\(allBuffers.count) buffers)")
         } else {
-            // Берем последние 45 секунд для контекста
+            // Берем последние buffers в пределах maxBufferDuration для полного контекста
             var accumulatedDuration: TimeInterval = 0
             var startIndex = allBuffers.count
             
@@ -286,7 +286,7 @@ class WhisperKitService: ObservableObject {
             }
             
             buffersToProcess = Array(allBuffers[startIndex...])
-            print("🔄 Processing with context: \(String(format: "%.1f", accumulatedDuration))s (\(buffersToProcess.count) buffers)")
+            print("🔄 Processing with full context: \(String(format: "%.1f", accumulatedDuration))s (\(buffersToProcess.count) buffers)")
         }
         
         Task {
