@@ -20,12 +20,6 @@
     "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService~partial.swiftmodule",
     "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.swiftdeps"
   },
-  "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift": {
-    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.d",
-    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.swift.o",
-    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType~partial.swiftmodule",
-    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.swiftdeps"
-  },
   "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechRecognizerService.swift": {
     "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechRecognizerService.d",
     "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechRecognizerService.swift.o",

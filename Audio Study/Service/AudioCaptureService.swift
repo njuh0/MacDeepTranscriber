@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import Speech // Import Speech framework
 import Combine
 
 @MainActor
@@ -11,7 +10,6 @@ class AudioCaptureService: ObservableObject {
     @Published var recognizedText: String = ""
     @Published var isSpeechRecognitionAvailable: Bool = false
     @Published var isMicrophoneAccessGranted: Bool = false
-    @Published var selectedEngine: SpeechEngineType = .appleSpeech
     @Published var isWhisperKitProcessing: Bool = false
     @Published var modelLoadingProgress: Double = 0.0
     @Published var isModelLoaded: Bool = false
@@ -24,11 +22,9 @@ class AudioCaptureService: ObservableObject {
     @Published var whisperMaxBufferDuration: TimeInterval = 120.0
 
     private var audioEngine: AVAudioEngine?
-    private var speechRecognizerService: SpeechRecognizerService
     private var whisperKitService: WhisperKitService
 
     init() {
-        speechRecognizerService = SpeechRecognizerService()
         whisperKitService = WhisperKitService()
 
         // Request microphone access early
@@ -45,10 +41,9 @@ class AudioCaptureService: ObservableObject {
             }
         }
         
-        setupSpeechRecognizerCallbacks()
         setupWhisperKitCallbacks()
         
-        // Set initial availability based on selected engine
+        // Set initial availability based on WhisperKit
         updateAvailability()
         
         // Subscribe to WhisperKit processing state
@@ -83,83 +78,34 @@ class AudioCaptureService: ObservableObject {
         }
     }
     
-    private func setupSpeechRecognizerCallbacks() {
-        speechRecognizerService.onError = { [weak self] error in
-            DispatchQueue.main.async {
-                if self?.selectedEngine == .appleSpeech {
-                    self?.errorMessage = error.localizedDescription
-                    print("SpeechRecognizerService Error: \(error.localizedDescription)")
-                }
-            }
-        }
-        speechRecognizerService.onAvailabilityChange = { [weak self] available in
-            DispatchQueue.main.async {
-                if self?.selectedEngine == .appleSpeech {
-                    self?.isSpeechRecognitionAvailable = available
-                    print("Apple Speech Recognizer availability changed: \(available)")
-                }
-            }
-        }
-        speechRecognizerService.onRecognitionResult = { [weak self] text in
-            DispatchQueue.main.async {
-                if self?.selectedEngine == .appleSpeech {
-                    self?.recognizedText = text
-                }
-            }
-        }
-    }
-    
     private func setupWhisperKitCallbacks() {
         whisperKitService.onError = { [weak self] error in
             DispatchQueue.main.async {
-                if self?.selectedEngine == .whisperKit {
                     self?.errorMessage = error.localizedDescription
                     print("WhisperKitService Error: \(error.localizedDescription)")
-                }
+                
             }
         }
         whisperKitService.onAvailabilityChange = { [weak self] available in
             DispatchQueue.main.async {
-                if self?.selectedEngine == .whisperKit {
                     self?.isSpeechRecognitionAvailable = available
                     print("WhisperKit availability changed: \(available)")
-                }
+                
             }
         }
         whisperKitService.onRecognitionResult = { [weak self] text in
             DispatchQueue.main.async {
-                if self?.selectedEngine == .whisperKit {
                     self?.recognizedText = text
-                }
+                
             }
         }
     }
     
     private func updateAvailability() {
-        switch selectedEngine {
-        case .appleSpeech:
-            isSpeechRecognitionAvailable = speechRecognizerService.isRecognitionAvailable
-        case .whisperKit:
-            isSpeechRecognitionAvailable = whisperKitService.isAvailable
-        }
+        isSpeechRecognitionAvailable = whisperKitService.isAvailable
     }
     
-    func switchEngine(to engine: SpeechEngineType) {
-        guard !isCapturing else {
-            errorMessage = "Cannot switch engines while capturing. Stop capture first."
-            return
-        }
-        
-        selectedEngine = engine
-        updateAvailability()
-        recognizedText = "" // Clear previous results
-        errorMessage = nil
-        
-        let engineName = engine.rawValue
-        statusMessage = "Switched to \(engineName). Press 'Start' to begin capture."
-        print("Switched to \(engineName)")
-    }
-    
+
     func switchWhisperModel(to modelName: String) {
         guard !isCapturing else {
             errorMessage = "Cannot switch models while capturing. Stop capture first."
@@ -205,21 +151,6 @@ class AudioCaptureService: ObservableObject {
     func startCapture() {
         guard !isCapturing else { return }
         
-        // Ensure microphone access is granted
-        guard isMicrophoneAccessGranted else {
-            errorMessage = AppError.microphonePermissionDenied.localizedDescription
-            print("Cannot start capture: Microphone access denied.")
-            return
-        }
-
-        // Ensure speech recognition is available before starting capture
-        guard isSpeechRecognitionAvailable else {
-            let engineName = selectedEngine.rawValue
-            errorMessage = "\(engineName) is not available."
-            print("Cannot start capture: \(engineName) not available.")
-            return
-        }
-
         if audioEngine != nil {
             stopCapture()
         }
@@ -229,20 +160,13 @@ class AudioCaptureService: ObservableObject {
             
             let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
             
-            // Start recognition with selected engine
-            switch selectedEngine {
-            case .appleSpeech:
-                try speechRecognizerService.startRecognition(audioFormat: recordingFormat)
-                statusMessage = "Audio capture active with Apple Speech Recognition. Listening..."
-            case .whisperKit:
-                try whisperKitService.startRecognition(audioFormat: recordingFormat)
-                statusMessage = "Audio capture active with WhisperKit. Processing every 3s..."
-            }
+            // Start recognition with WhisperKit
+            try whisperKitService.startRecognition(audioFormat: recordingFormat)
+            statusMessage = "Audio capture active with WhisperKit. Processing..."
             
             isCapturing = true
             errorMessage = nil
             recognizedText = ""
-            print("Capture started with \(selectedEngine.rawValue).")
         } catch {
             isCapturing = false
             stopCapture()
@@ -258,13 +182,8 @@ class AudioCaptureService: ObservableObject {
     func stopCapture() {
         guard isCapturing else { return }
 
-        // Stop recognition based on selected engine
-        switch selectedEngine {
-        case .appleSpeech:
-            speechRecognizerService.stopRecognition()
-        case .whisperKit:
-            whisperKitService.stopRecognition()
-        }
+        // Stop recognition with WhisperKit
+        whisperKitService.stopRecognition()
 
         if let engine = audioEngine {
             engine.stop()
@@ -275,7 +194,6 @@ class AudioCaptureService: ObservableObject {
         audioEngine = nil
 
         isCapturing = false
-        statusMessage = "Audio capture and \(selectedEngine.rawValue) stopped."
         print("Capture stopped.")
     }
 
@@ -313,13 +231,9 @@ class AudioCaptureService: ObservableObject {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, time in
             guard let self = self else { return }
             
-            switch self.selectedEngine {
-            case .appleSpeech:
-                self.speechRecognizerService.appendAudioBuffer(buffer)
-            case .whisperKit:
-                Task { @MainActor in
-                    self.whisperKitService.appendAudioBuffer(buffer)
-                }
+            // Process buffer with WhisperKit
+            Task { @MainActor in
+                self.whisperKitService.appendAudioBuffer(buffer)
             }
         }
         print("InputNode tap installed on bus 0.")
