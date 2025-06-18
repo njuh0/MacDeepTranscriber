@@ -59,6 +59,8 @@ class WhisperKitService: ObservableObject {
     private var lastTranscriptionLength: Int = 0  // Track length of last transcription to detect new content
     private var lastContextTranscription: String = ""  // Store last context transcription for comparison
     
+    @Published var transcriptionList: [String] = []
+    
     // WhisperKit instance (will be uncommented when package is added)
     private var whisperKit: WhisperKit?
     
@@ -349,21 +351,24 @@ class WhisperKitService: ObservableObject {
                         print("🎵 Keeping previous transcription (current seems truncated): \(previousAccumulated.count) chars vs \(transcription.count) chars")
                     } else {
                         // Buffer reset detected - archive the previous text
-                        if !previousAccumulated.isEmpty && previousAccumulated.count > 50 {
-                            if !archivedText.isEmpty {
-                                archivedText += "\n\n--- Session Break ---\n\n" + previousAccumulated
-                            } else {
-                                archivedText = previousAccumulated
-                            }
-                            self.onArchivedTextUpdate?(archivedText)
-                            print("🗄️ Archived previous text due to buffer reset: \(previousAccumulated.count) chars")
-                        }
-                        print("🎵 Using new transcription: \(accumulatedText)")
-                    }
+                if !previousAccumulated.isEmpty && previousAccumulated.count > 50 {
+                        if !archivedText.isEmpty {
+                           
+
+                            
+                            archivedText += "\n\n--- Session Break ---\n\n" + previousAccumulated
+                        } else {
+                            archivedText = previousAccumulated
+                        } 
+                        self.transcriptionList.append(previousAccumulated)
+                        self.onArchivedTextUpdate?(archivedText)
+                        print("🗄️ Archived previous text due to buffer reset: \(previousAccumulated.count) chars")
+                }
+                print("🎵 Using new transcription: \(accumulatedText)")   
+                }
                 } else {
                     print("🎵 Full context transcription: \(accumulatedText)")
-                }
-                
+                }                
                 self.onRecognitionResult?(accumulatedText)
             }
             

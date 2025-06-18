@@ -234,6 +234,42 @@ struct ContentView: View {
                 .padding(.bottom)
             }
             
+            // Previous transcriptions section (only show when WhisperKit is selected)
+            if audioCaptureService.selectedEngine == .whisperKit {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Previous Transcriptions")
+                        .font(.headline)
+                        .foregroundColor(.cyan)
+                    
+                    ScrollView(.vertical, showsIndicators: true) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if audioCaptureService.transcriptionList.isEmpty {
+                                Text("No previous transcriptions yet.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(8)
+                            } else {
+                                ForEach(audioCaptureService.transcriptionList.reversed(), id: \.self) { text in
+                                    Text(text)
+                                        .font(.caption)
+                                        .padding(8)
+                                        .background(Color(NSColor.controlBackgroundColor))
+                                        .cornerRadius(8)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 200)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.cyan, lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
+            
             // Clear text button
             if !audioCaptureService.recognizedText.isEmpty {
                 HStack {

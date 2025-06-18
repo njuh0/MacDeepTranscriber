@@ -18,6 +18,7 @@ class AudioCaptureService: ObservableObject {
     @Published var isModelLoaded: Bool = false
     @Published var selectedWhisperModel: String = "base"
     @Published var modelLoadingStatus: String = "Ready"
+    @Published var transcriptionList: [String] = []
     
     // WhisperKit Configuration
     @Published var whisperTranscriptionInterval: TimeInterval = 15.0
@@ -67,6 +68,10 @@ class AudioCaptureService: ObservableObject {
         whisperKitService.$modelLoadingStatus
             .receive(on: DispatchQueue.main)
             .assign(to: &$modelLoadingStatus)
+            
+        whisperKitService.$transcriptionList
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$transcriptionList)
             
         // Sync initial model selection and configuration
         Task { @MainActor in
