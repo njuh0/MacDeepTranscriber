@@ -1,0 +1,4 @@
+module Jinja {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/arm64-apple-macosx/debug/Jinja.build/Jinja-Swift.h"
+    requires objc
+}

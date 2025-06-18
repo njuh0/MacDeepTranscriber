@@ -50,7 +50,7 @@ class SpeechRecognizerService: NSObject {
     override init() { // When inheriting from NSObject, override init() is often needed if you have a custom initializer
         // Initialize with default locale or specify one
         // speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        speechRecognizer = SFSpeechRecognizer()
 
         // Call super.init() before accessing self properties
         super.init()

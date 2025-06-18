@@ -1,0 +1,17 @@
+{
+  "": {
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/master.swiftdeps"
+  },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/checkouts/swift-transformers/Sources/Generation/Generation.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/Generation.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/Generation.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/Generation~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/Generation.swiftdeps"
+  },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/checkouts/swift-transformers/Sources/Generation/GenerationConfig.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/GenerationConfig.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/GenerationConfig.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/GenerationConfig~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/GenerationConfig.swiftdeps"
+  }
+}

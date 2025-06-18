@@ -1,0 +1,4 @@
+module ArgumentParser {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/arm64-apple-macosx/debug/ArgumentParser-tool.build/ArgumentParser-Swift.h"
+    requires objc
+}

@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Collections.build/master.swiftdeps"
+  },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/checkouts/swift-collections/Sources/Collections/Collections.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Collections.build/Collections.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Collections.build/Collections.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Collections.build/Collections~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Collections.build/Collections.swiftdeps"
+  }
+}

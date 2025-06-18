@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/ArgumentParserToolInfo.build/master.swiftdeps"
+  },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/checkouts/swift-argument-parser/Sources/ArgumentParserToolInfo/ToolInfo.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/ArgumentParserToolInfo.build/ToolInfo.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/ArgumentParserToolInfo.build/ToolInfo.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/ArgumentParserToolInfo.build/ToolInfo~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/ArgumentParserToolInfo.build/ToolInfo.swiftdeps"
+  }
+}

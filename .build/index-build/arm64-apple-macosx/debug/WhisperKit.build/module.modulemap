@@ -1,0 +1,4 @@
+module WhisperKit {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/WhisperKit.build/WhisperKit-Swift.h"
+    requires objc
+}

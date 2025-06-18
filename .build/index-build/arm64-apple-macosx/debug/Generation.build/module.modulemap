@@ -1,0 +1,4 @@
+module Generation {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Generation.build/Generation-Swift.h"
+    requires objc
+}

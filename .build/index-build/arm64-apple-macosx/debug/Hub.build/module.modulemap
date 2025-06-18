@@ -1,0 +1,4 @@
+module Hub {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Hub.build/Hub-Swift.h"
+    requires objc
+}

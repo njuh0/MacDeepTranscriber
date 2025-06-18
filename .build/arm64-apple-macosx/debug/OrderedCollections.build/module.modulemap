@@ -1,0 +1,4 @@
+module OrderedCollections {
+    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/arm64-apple-macosx/debug/OrderedCollections.build/OrderedCollections-Swift.h"
+    requires objc
+}
