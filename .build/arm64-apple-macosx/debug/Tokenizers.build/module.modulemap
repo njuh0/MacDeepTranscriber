@@ -1,4 +1,0 @@
-module Tokenizers {
-    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/arm64-apple-macosx/debug/Tokenizers.build/Tokenizers-Swift.h"
-    requires objc
-}

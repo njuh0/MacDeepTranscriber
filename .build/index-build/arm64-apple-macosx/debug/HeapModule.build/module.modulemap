@@ -1,4 +1,0 @@
-module HeapModule {
-    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/HeapModule.build/HeapModule-Swift.h"
-    requires objc
-}

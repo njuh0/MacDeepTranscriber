@@ -1,4 +1,0 @@
-module TensorUtils {
-    header "/Users/njuh/Megadev/swift-dev/Audio Study/.build/arm64-apple-macosx/debug/TensorUtils.build/TensorUtils-Swift.h"
-    requires objc
-}
