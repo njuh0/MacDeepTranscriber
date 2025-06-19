@@ -561,9 +561,12 @@ class AudioCaptureService: ObservableObject {
     
     // Helper method to update WhisperKit display list (combines permanent + session)
     private func updateWhisperKitDisplayList() {
-        // Combine permanent transcriptions with current session transcriptions
+        // Always combine permanent transcriptions with current session transcriptions
         let permanentList = whisperKitService.transcriptionList
         let sessionList = whisperKitService.sessionTranscriptions
+        
+        // Always show both permanent and session transcriptions
+        // Session transcriptions will remain visible until a new session starts or history is cleared
         transcriptionList = permanentList + sessionList
     }
     

@@ -267,49 +267,16 @@ class WhisperKitService: ObservableObject {
     func stopRecognition() {
         print("🛑 WhisperKit: stopRecognition called")
         
-        // Устанавливаем флаг остановки для предотвращения дублирования
+        // Set stopping flag to prevent any more periodic transcriptions
         isStopping = true
         
         isRecording = false
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
         
-        // Ensure final transcription is saved (but avoid duplicates)
-        if !accumulatedText.isEmpty {
-            let trimmedFinalText = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            if sessionTranscriptions.isEmpty {
-                // No session transcriptions yet, add the final one
-                let finalEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
-                sessionTranscriptions.append(finalEntry)
-                print("💾 WhisperKit: Added final transcription to empty session: \(trimmedFinalText.count) chars")
-            } else {
-                // Check if we need to update the last entry or add a new one
-                let lastEntry = sessionTranscriptions.last!
-                let lastText = lastEntry.transcription.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                if lastText != trimmedFinalText {
-                    // Check similarity to decide whether to update or add new
-                    let similarity = calculateTextSimilarity(lastText.lowercased(), trimmedFinalText.lowercased())
-                    
-                    if similarity > 0.7 {
-                        // High similarity - update the last entry with the more complete version
-                        let updatedEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
-                        sessionTranscriptions[sessionTranscriptions.count - 1] = updatedEntry
-                        print("🔄 WhisperKit: Updated last session entry with final transcription: \(trimmedFinalText.count) chars")
-                    } else {
-                        // Low similarity - add as new entry
-                        let finalEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
-                        sessionTranscriptions.append(finalEntry)
-                        print("➕ WhisperKit: Added new final transcription to session: \(trimmedFinalText.count) chars")
-                    }
-                } else {
-                    print("✅ WhisperKit: Final transcription already matches last session entry")
-                }
-            }
-        } else {
-            print("🚫 WhisperKit: No accumulated text to save")
-        }
+        // Don't add any more transcriptions to session - they should already be captured
+        // during the periodic transcription process. Just clean up and stop.
+        print("📝 WhisperKit: Session transcriptions already captured: \(sessionTranscriptions.count) entries")
         
         bufferLock.lock()
         audioBuffers.removeAll()
@@ -322,7 +289,7 @@ class WhisperKitService: ObservableObject {
         lastContextTranscription = ""
         lastBufferResetTime = Date()
         
-        // Сбрасываем флаг остановки
+        // Reset stopping flag
         isStopping = false
                 
         print("✅ WhisperKit recognition stopped. Final session count: \(sessionTranscriptions.count)")
