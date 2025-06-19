@@ -64,7 +64,37 @@ struct ContentView: View {
             Text("Record")
                 .font(.largeTitle)
                 .padding()
+                
+            // Parallel Speech Recognition Options
             VStack(spacing: 8) {
+                Toggle(isOn: $audioCaptureService.useAppleSpeechInParallel) {
+                    HStack {
+                        Text("Use Apple Speech in parallel")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Text("Run native macOS speech recognition alongside WhisperKit")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .padding(.vertical, 4)
+                .onChange(of: audioCaptureService.useAppleSpeechInParallel) { newValue in
+                    audioCaptureService.toggleAppleSpeechParallel(newValue)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+            
+            // WhisperKit Model Selection
+            VStack(spacing: 8) {
+                Text("WhisperKit Model")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
                 Picker(
                     "Model",
                     selection: $audioCaptureService.selectedWhisperModel
@@ -92,6 +122,40 @@ struct ContentView: View {
             .padding(.horizontal)
             .padding(.bottom)
 
+            // Speech Engine Configuration
+            // Apple Speech Settings (visible when Apple Speech is enabled)
+            if audioCaptureService.useAppleSpeechInParallel {
+                VStack(spacing: 12) {
+                    Text("Apple Speech Settings")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    // Language selection for Apple Speech
+                    Picker(
+                        "Language",
+                        selection: $audioCaptureService.selectedLocale
+                    ) {
+                        ForEach(audioCaptureService.getSupportedLocalesWithNames(), id: \.0.identifier) { locale, name in
+                            Text(name)
+                                .tag(locale)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .disabled(audioCaptureService.isCapturing)
+                    .onChange(of: audioCaptureService.selectedLocale) { newLocale in
+                        audioCaptureService.changeLocale(to: newLocale)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .opacity(0.5)
+                )
+                .padding(.horizontal)
+            }
+            
             // WhisperKit Configuration
             VStack(spacing: 12) {
                 Text("WhisperKit Settings")
@@ -188,20 +252,63 @@ struct ContentView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 0) {
-                    if audioCaptureService.recognizedText.isEmpty {
-                        Text("Transcribed text will appear here...")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                    } else {
-                        Text(audioCaptureService.recognizedText)
-                            .font(.title3)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundColor(.primary)
-                            .textSelection(.enabled)
-                            .padding()
-                            .id("transcriptionText")
+                    // WhisperKit Output
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("WhisperKit Output:")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        if audioCaptureService.recognizedText.isEmpty {
+                            Text("WhisperKit transcription will appear here...")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                        } else {
+                            Text(audioCaptureService.recognizedText)
+                                .font(.title3)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .foregroundColor(.primary)
+                                .textSelection(.enabled)
+                                .padding()
+                                .id("transcriptionText")
+                        }
+                    }
+                    
+                    // Apple Speech Output (only if enabled)
+                    if audioCaptureService.useAppleSpeechInParallel {
+                        Divider()
+                            .padding(.horizontal)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Apple Speech Output:")
+                                    .font(.headline)
+                                    .foregroundColor(.green)
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                            
+                            if audioCaptureService.appleSpeechText.isEmpty {
+                                Text("Apple Speech transcription will appear here...")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                            } else {
+                                Text(audioCaptureService.appleSpeechText)
+                                    .font(.title3)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .foregroundColor(.primary)
+                                    .textSelection(.enabled)
+                                    .padding()
+                                    .id("appleSpeechText")
+                            }
+                        }
                     }
 
                     Spacer(minLength: 0)
@@ -215,8 +322,16 @@ struct ContentView: View {
                     }
                 }
             }
+            // Add scrolling for Apple Speech text too
+            .onChange(of: audioCaptureService.appleSpeechText) { _ in
+                if audioCaptureService.useAppleSpeechInParallel && !audioCaptureService.appleSpeechText.isEmpty {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo("appleSpeechText", anchor: .bottom)
+                    }
+                }
+            }
         }
-        .frame(height: 100)
+        .frame(height: audioCaptureService.useAppleSpeechInParallel ? 200 : 120)
         .background(Color(NSColor.textBackgroundColor))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -336,6 +451,7 @@ struct ContentView: View {
 //        ContentView()
 //    }
 //}
-#Preview {
-    ContentView()
-}
+// Commenting out the preview to avoid circular reference issues
+//#Preview {
+//    ContentView()
+//}

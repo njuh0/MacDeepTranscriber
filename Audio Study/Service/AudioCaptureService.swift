@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import Speech
 
 @MainActor
 class AudioCaptureService: ObservableObject {
@@ -17,16 +18,28 @@ class AudioCaptureService: ObservableObject {
     @Published var modelLoadingStatus: String = "Ready"
     @Published var transcriptionList: [String] = []
     
+    // Speech engine options
+    @Published var useAppleSpeechInParallel: Bool = false
+    @Published var appleSpeechText: String = ""
+    
     // WhisperKit Configuration
     @Published var whisperTranscriptionInterval: TimeInterval = 15.0
     @Published var whisperMaxBufferDuration: TimeInterval = 120.0
+    
+    // Apple Speech Configuration
+    @Published var selectedLocale: Locale = Locale(identifier: "en-US")
 
     private var audioEngine: AVAudioEngine?
     private var whisperKitService: WhisperKitService
+    // Expose the service so ContentView can access locale info
+    let speechRecognizerService: SpeechRecognizerService
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
+        // Initialize services
         whisperKitService = WhisperKitService()
-
+        speechRecognizerService = SpeechRecognizerService()
+        
         // Request microphone access early
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
@@ -40,6 +53,11 @@ class AudioCaptureService: ObservableObject {
             }
         }
         
+        // Set up callbacks after all properties are initialized
+        setupCallbacks()
+    }
+    
+    private func setupCallbacks() {
         setupWhisperKitCallbacks()
         
         // Set initial availability based on WhisperKit
@@ -66,8 +84,28 @@ class AudioCaptureService: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$transcriptionList)
             
+        // Set up Apple Speech callbacks
+        speechRecognizerService.$recognizedText
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                // Always store in appleSpeechText
+                self?.appleSpeechText = text
+            }
+            .store(in: &cancellables)
+            
+        speechRecognizerService.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] error in
+                if self?.useAppleSpeechInParallel == true {
+                    // Only show Apple Speech errors if we're using it
+                    self?.errorMessage = "Apple Speech: \(error)"
+                }
+            }
+            .store(in: &cancellables)
+            
         // Sync initial model selection and configuration
-        Task { @MainActor in
+        Task { @MainActor [self] in
             if selectedWhisperModel != "base" {
                 switchWhisperModel(to: selectedWhisperModel)
             }
@@ -100,8 +138,26 @@ class AudioCaptureService: ObservableObject {
         }
     }
     
+    // We no longer need this method since we're using WhisperKit as the primary engine
+    // and Apple Speech is only used in parallel when enabled
+    
     private func updateAvailability() {
+        // Since WhisperKit is our primary engine now
         isSpeechRecognitionAvailable = whisperKitService.isAvailable
+    }
+    
+    // Method to toggle Apple Speech parallel processing
+    func toggleAppleSpeechParallel(_ enabled: Bool) {
+        useAppleSpeechInParallel = enabled
+        
+        // If we're currently capturing and enabling Apple Speech, start it
+        if isCapturing && enabled {
+            startAppleSpeech()
+        } 
+        // If we're currently capturing and disabling Apple Speech, stop it
+        else if isCapturing && !enabled {
+            stopAppleSpeech()
+        }
     }
     
 
@@ -155,17 +211,20 @@ class AudioCaptureService: ObservableObject {
         }
 
         do {
-            try configureAudioEngine()
+            // Clear previous text
+            recognizedText = ""
+            appleSpeechText = ""
+            errorMessage = nil
             
-            let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
+            // Always start WhisperKit as primary engine
+            try startWhisperKitCapture()
             
-            // Start recognition with WhisperKit
-            try whisperKitService.startRecognition(audioFormat: recordingFormat)
-            statusMessage = "Audio capture active with WhisperKit. Processing..."
+            // Start Apple Speech if enabled
+            if useAppleSpeechInParallel {
+                try startAppleSpeechCapture()
+            }
             
             isCapturing = true
-            errorMessage = nil
-            recognizedText = ""
         } catch {
             isCapturing = false
             stopCapture()
@@ -199,9 +258,15 @@ class AudioCaptureService: ObservableObject {
     func stopCapture() {
         guard isCapturing else { return }
 
-        // Stop recognition with WhisperKit
+        // Always stop WhisperKit
         whisperKitService.stopRecognition()
+        
+        // Stop Apple Speech if it was enabled
+        if useAppleSpeechInParallel {
+            speechRecognizerService.stopRecognition()
+        }
 
+        // Stop audio engine in any case
         if let engine = audioEngine {
             engine.stop()
             if engine.inputNode.numberOfInputs > 0 {
@@ -212,6 +277,53 @@ class AudioCaptureService: ObservableObject {
 
         isCapturing = false
         print("Capture stopped.")
+    }
+    
+    // Helper methods for Apple Speech
+    private func startAppleSpeech() {
+        Task {
+            do {
+                try await speechRecognizerService.startRecognition()
+            } catch {
+                print("Error starting Apple Speech: \(error.localizedDescription)")
+                if useAppleSpeechInParallel {
+                    errorMessage = "Apple Speech error: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func stopAppleSpeech() {
+        speechRecognizerService.stopRecognition()
+    }
+    
+    // MARK: - Speech Engine Specific Methods
+    
+    private func startWhisperKitCapture() throws {
+        try configureAudioEngine()
+        
+        let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
+        
+        // Start recognition with WhisperKit
+        try whisperKitService.startRecognition(audioFormat: recordingFormat)
+        statusMessage = "Audio capture active with WhisperKit. Processing..."
+    }
+    
+    private func startAppleSpeechCapture() throws {
+        // Start Apple Speech recognition using Task to handle async
+        Task {
+            do {
+                try await speechRecognizerService.startRecognition()
+                await MainActor.run {
+                    statusMessage = "Audio capture active with Apple Speech. Processing..."
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Failed to start Apple Speech: \(error.localizedDescription)"
+                    self.isCapturing = false
+                }
+            }
+        }
     }
 
     private func configureAudioEngine() throws {
@@ -280,8 +392,21 @@ class AudioCaptureService: ObservableObject {
                 }
             } else {
                 print("Fatal Error starting AVAudioEngine: \(nsError.localizedDescription) (Domain: \(nsError.domain), Code: \(nsError.code))")
-                throw AppError.audioSessionError("Audio engine failed to start: \(nsError.localizedDescription)")
+                throw AppError.engineStartError("Audio engine failed to start: \(nsError.localizedDescription)")
             }
         }
+    }
+    
+    // Apple Speech methods
+    func getSupportedLocalesWithNames() -> [(Locale, String)] {
+        return speechRecognizerService.getSupportedLocalesWithNames()
+    }
+    
+    func changeLocale(to locale: Locale) {
+        if isCapturing {
+            stopCapture()
+        }
+        selectedLocale = locale
+        speechRecognizerService.changeLocale(to: locale)
     }
 }

@@ -4,7 +4,7 @@ import AVFoundation
 /// Application-wide error types
 enum AppError: Error, LocalizedError {
     case microphonePermissionDenied
-    case audioSessionError(String)
+    case engineStartError(String)
     case deviceNotAvailable
     case coreAudioError(Int, String)
     case unknownError(String)
@@ -13,8 +13,8 @@ enum AppError: Error, LocalizedError {
         switch self {
         case .microphonePermissionDenied:
             return "Microphone access denied. Please enable microphone access in Settings."
-        case .audioSessionError(let message):
-            return "Audio session error: \(message)"
+        case .engineStartError(let message):
+            return "Audio engine error: \(message)"
         case .deviceNotAvailable:
             return "Audio device not available. Please check your audio input settings and ensure BlackHole is properly configured."
         case .coreAudioError(let code, let message):
