@@ -57,11 +57,12 @@ class WhisperKitService: ObservableObject {
     private var lastContextTranscription: String = ""  // Store last context transcription for comparison
     private var lastBufferResetTime: Date = Date()  // Время последнего сброса или очистки буфера
     
-    @Published var transcriptionList: [String] = []
+    @Published var transcriptionList: [TranscriptionEntry] = [] // Updated type
     
     // WhisperKit instance (will be uncommented when package is added)
     private var whisperKit: WhisperKit?
-    
+    // Removed historySeparator
+
     // Configuration
     private var modelName: String
     @Published var transcriptionInterval: TimeInterval
@@ -75,6 +76,44 @@ class WhisperKitService: ObservableObject {
         self.maxBufferDuration = maxBufferDuration
         
         initializeWhisperKit()
+        loadWhisperHistoryFromJSON() // Load history
+    }
+
+    private func getDocumentsDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+
+    private func saveWhisperHistoryToJSON() {
+        let fileURL = getDocumentsDirectory().appendingPathComponent("whisper_history.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+
+        do {
+            let data = try encoder.encode(self.transcriptionList)
+            try data.write(to: fileURL, options: [.atomicWrite])
+            print("Successfully saved Whisper transcription history to \(fileURL.path)")
+        } catch {
+            print("Error saving Whisper transcription history to JSON: \(error.localizedDescription)")
+        }
+    }
+
+    private func loadWhisperHistoryFromJSON() {
+        let fileURL = getDocumentsDirectory().appendingPathComponent("whisper_history.json")
+        
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("Whisper history JSON file does not exist. Starting with empty history.")
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            self.transcriptionList = try decoder.decode([TranscriptionEntry].self, from: data)
+            print("Successfully loaded Whisper transcription history from JSON. Count: \(self.transcriptionList.count)")
+        } catch {
+            print("Error loading Whisper transcription history from JSON: \(error.localizedDescription). Starting with empty history.")
+            self.transcriptionList = [] // Ensure clean state on error
+        }
     }
     
     // Methods to update configuration
@@ -324,7 +363,7 @@ class WhisperKitService: ObservableObject {
             
             // Transcribe using WhisperKit
             let transcription = try await transcribeAudioData(audioData)
-             
+            
             // Update UI on main thread - use smart transcription replacement
             self.isProcessing = false
             if !transcription.isEmpty {
@@ -340,61 +379,35 @@ class WhisperKitService: ObservableObject {
                 let canAddTranscription = timeSinceBufferReset > maxBufferDuration * 0.90
                 print("Buffer reset time: \(String(format: "%.1f", timeSinceBufferReset))s, max buffer duration: \(String(format: "%.1f", maxBufferDuration))s")
        
-                if canAddTranscription { // This condition is based on timeSinceBufferReset
-                    let currentWhisperResult = transcription.trimmingCharacters(in: .whitespacesAndNewlines) // Use the direct result, trimmed
-
-                    if currentWhisperResult.isEmpty { // Don't process empty results
-                        // Optionally log or handle empty transcription results if needed
-                        print("⚠️ WhisperKit produced an empty transcription result. Skipping history update.")
-                    } else if !self.transcriptionList.isEmpty {
+                if canAddTranscription {
+                    if !self.transcriptionList.isEmpty {
                         let lastIndex = self.transcriptionList.count - 1
-                        let lastSavedTranscription = self.transcriptionList[lastIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-
-                        let cleanCurrentWhisper = currentWhisperResult.lowercased() // Already trimmed
-                        let cleanLastSaved = lastSavedTranscription.lowercased()    // Already trimmed
+                        // Assuming lastTranscription here is used for its textual content for similarity
+                        let lastTranscriptionText = self.transcriptionList[lastIndex].transcription 
+                        let cleanLastTranscription = lastTranscriptionText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                         
-                        let similarity = calculateTextSimilarity(cleanCurrentWhisper, cleanLastSaved)
-
-                        let shortTextMaxLength = 10
-                        var updateThreshold = 0.5 // Default threshold for updating an existing entry (if similarity is GREATER)
-                        var textCategoryDetail = "long/mixed"
-
-                        if cleanLastSaved.count < shortTextMaxLength && cleanCurrentWhisper.count < shortTextMaxLength {
-                            updateThreshold = 0.8 // If both current and last saved are short, require higher similarity to update
-                            textCategoryDetail = "short/short"
-                        }
-                        print("🔍 WhisperKit Similarity: \(String(format: "%.2f", similarity)) [\(textCategoryDetail), update if > \(updateThreshold))] CURRENT: \(cleanCurrentWhisper) | LAST_SAVED: \(cleanLastSaved)")
-
-                        if similarity > updateThreshold {
-                            self.transcriptionList[lastIndex] = currentWhisperResult // Save the non-lowercased, trimmed version
-                            print("🔄 WhisperKit: Updated last transcription. New: \(currentWhisperResult)")
+                        let similarity = calculateTextSimilarity(cleanTranscription, cleanLastTranscription)
+                        print("🔍 Similarity: \(String(format: "%.2f", similarity))")
+                        if similarity > 0.5 {
+                            let updatedEntry = TranscriptionEntry(date: Date(), transcription: transcription)
+                            self.transcriptionList[lastIndex] = updatedEntry
+                            self.saveWhisperHistoryToJSON()
+                            print("🔄 Updated last transcription entry with more complete version: \(transcription.count) chars")
                         } else {
-                            // Only append if it's meaningfully different and not an empty string
-                            if !currentWhisperResult.isEmpty { // Redundant due to check above, but safe
-                                 // Check if currentWhisperResult is same as lastSavedTranscription to avoid logical duplicate if somehow similarity was low but text is same
-                                if currentWhisperResult != lastSavedTranscription {
-                                    self.transcriptionList.append(currentWhisperResult)
-                                    print("➕ WhisperKit: Appended new transcription. New: \(currentWhisperResult)")
-                                } else {
-                                     print("ℹ️ WhisperKit: New transcription is identical to last saved, no append. Current: \(currentWhisperResult)")
-                                }
-                            }
+                            let newEntry = TranscriptionEntry(date: Date(), transcription: accumulatedText) // accumulatedText contains the full new transcription
+                            self.transcriptionList.append(newEntry)
+                            self.saveWhisperHistoryToJSON()
                         }
-                    } else { // transcriptionList is empty
-                        if !currentWhisperResult.isEmpty { // Don't add empty string as first item
-                            self.transcriptionList.append(currentWhisperResult)
-                            print("➕ WhisperKit: Added first transcription to list. New: \(currentWhisperResult)")
-                        } else {
-                            print("⚠️ WhisperKit produced an empty transcription result. Skipping first history entry.")
-                        }
+                    } else {
+                        // Список пуст, просто добавляем первую запись
+                        let newEntry = TranscriptionEntry(date: Date(), transcription: accumulatedText)
+                        self.transcriptionList.append(newEntry)
+                        self.saveWhisperHistoryToJSON()
+                        print("➕ Added first transcription entry to list: \(accumulatedText.count) chars")
                     }
-                    // Ensure accumulatedText reflects the latest state if it's used elsewhere,
-                    // though its direct use in history is replaced by currentWhisperResult.
-                    // self.accumulatedText = currentWhisperResult // This line might be useful depending on how accumulatedText is used later.
-                                                                // For now, the problem specified only the list.
                 }
-                print("🎵 Current transcription: \(accumulatedText.count) chars") // accumulatedText here is still the full context transcription
-                self.onRecognitionResult?(accumulatedText) // Report full context for live view
+                print("🎵 Current transcription (accumulatedText): \(accumulatedText.count) chars")
+                self.onRecognitionResult?(accumulatedText)
             }
             
         } catch {

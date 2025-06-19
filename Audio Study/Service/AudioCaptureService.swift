@@ -16,7 +16,7 @@ class AudioCaptureService: ObservableObject {
     @Published var isModelLoaded: Bool = false
     @Published var selectedWhisperModel: String = "base"
     @Published var modelLoadingStatus: String = "Ready"
-    @Published var transcriptionList: [String] = []
+ @Published var transcriptionList: [TranscriptionEntry] = []
     
     // Speech engine selection
     @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.whisperKit]
@@ -93,10 +93,6 @@ class AudioCaptureService: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$modelLoadingStatus)
             
-        whisperKitService.$transcriptionList
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$transcriptionList)
-            
         // Set up Apple Speech callbacks
         speechRecognizerService.$recognizedText
             .receive(on: DispatchQueue.main)
@@ -106,10 +102,10 @@ class AudioCaptureService: ObservableObject {
             }
             .store(in: &cancellables)
             
-        speechRecognizerService.$transcriptionHistory
+        speechRecognizerService.$transcriptionHistory // This is the property that needs to be observed
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] history in
-                self?.appleSpeechHistory = history
+            .sink { [weak self] (history: [TranscriptionEntry]) in // Correctly expect [TranscriptionEntry]
+                self?.transcriptionList = history // Assign to the correct property
             }
             .store(in: &cancellables)
             
