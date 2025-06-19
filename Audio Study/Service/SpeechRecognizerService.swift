@@ -157,8 +157,26 @@ class SpeechRecognizerService: ObservableObject {
             
             Task { @MainActor in
                 if let error = error {
+                    // Don't show cancellation errors as they are expected when stopping recognition
+                    let nsError = error as NSError
+                    
+                    // Check for various cancellation and expected stop-related error patterns
+                    let errorDescription = nsError.localizedDescription.lowercased()
+                    let isExpectedStopError = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 203 ||
+                                            nsError.domain == "com.apple.speech.speechrecognitionerror" && nsError.code == 1 ||
+                                            errorDescription.contains("cancel") ||
+                                            errorDescription.contains("cancelled") ||
+                                            errorDescription.contains("no speech detected")
+                    
+                    if isExpectedStopError {
+                        // Recognition was cancelled or no speech detected - this is expected when stopping, not an error
+                        print("🔕 Apple Speech recognition stopped (expected): \(error.localizedDescription)")
+                    } else {
+                        // Only show actual errors, not expected stop conditions
+                        self.errorMessage = "Recognition error: \(error.localizedDescription)"
+                        print("❌ Apple Speech recognition error: \(error)")
+                    }
                     self.stopRecognition()
-                    self.errorMessage = "Recognition error: \(error.localizedDescription)"
                     return
                 }
                 
@@ -219,6 +237,7 @@ class SpeechRecognizerService: ObservableObject {
         recognitionTask = nil
         
         isRecognizing = false
+        errorMessage = nil // Clear any error message when stopping normally
         
         // Don't clear session here - it should remain visible in UI until explicitly saved to permanent storage
         print("✅ Apple Speech recognition stopped. Session transcriptions count: \(sessionTranscriptions.count)")
@@ -390,16 +409,7 @@ class SpeechRecognizerService: ObservableObject {
         previousRecognizedText = newText // Always update to the latest text from the recognizer
     }
     
-    // Получение полной истории транскрипций (включая текущую сессию)
-    func getFullTranscriptionHistory() -> String {
-        let allTranscriptions = permanentHistory + sessionTranscriptions
-        return allTranscriptions.map { $0.transcription }.joined(separator: "\n")
-    }
-    
-    // Получение истории только из постоянного хранилища
-    func getPermanentTranscriptionHistory() -> String {
-        return permanentHistory.map { $0.transcription }.joined(separator: "\n")
-    }
+
     
     // Start a new recording session (clears previous session transcriptions)
     func startNewRecordingSession() {

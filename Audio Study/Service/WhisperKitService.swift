@@ -836,9 +836,4 @@ extension WhisperKitService {
         lastContextTranscription = ""
         isStopping = false
     }
-    
-    // Get all transcriptions (permanent + session) for display
-    func getAllTranscriptions() -> [TranscriptionEntry] {
-        return transcriptionList + sessionTranscriptions
-    }
 }
