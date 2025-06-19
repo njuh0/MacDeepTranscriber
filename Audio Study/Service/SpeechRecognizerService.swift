@@ -13,7 +13,6 @@ class SpeechRecognizerService: ObservableObject {
     @Published var selectedLocale: Locale = Locale(identifier: "en-US")
     
     private var previousRecognizedText: String = "" // Для отслеживания изменений
-    private var significantChangeThreshold: Int = 5 // Минимальная разница в символах для сохранения
     
     // For handling continuous recognition
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -147,10 +146,15 @@ class SpeechRecognizerService: ObservableObject {
     }
     
     func stopRecognition() {
-        // Сохраняем текущий текст в историю, если он не пустой
-        if !recognizedText.isEmpty && 
-           (transcriptionHistory.isEmpty || transcriptionHistory.last != recognizedText) {
-            transcriptionHistory.append(recognizedText)
+        // Save the current recognized text to history if it's not empty 
+        // and different from the last entry in the history.
+        // Also, trim whitespace to avoid saving empty or whitespace-only strings.
+        let finalText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !finalText.isEmpty {
+            if transcriptionHistory.last != finalText {
+                transcriptionHistory.append(finalText)
+                print("History added (stopRecognition): \(finalText)")
+            }
         }
         
         audioEngine?.stop()
@@ -173,6 +177,43 @@ class SpeechRecognizerService: ObservableObject {
         }
     }
     
+    // Функция для расчета схожести двух текстов
+    private func calculateTextSimilarity(_ text1: String, _ text2: String) -> Double {
+        // Если один из текстов пустой, возвращаем 0
+        if text1.isEmpty || text2.isEmpty {
+            return 0.0
+        }
+        
+        // Если тексты идентичны, возвращаем 1
+        if text1 == text2 {
+            return 1.0
+        }
+        
+        // Простой алгоритм - проверяем содержание одного текста в другом
+        if text1.count > text2.count {
+            if text1.contains(text2) {
+                return Double(text2.count) / Double(text1.count)
+            }
+        } else {
+            if text2.contains(text1) {
+                return Double(text1.count) / Double(text2.count)
+            }
+        }
+        
+        // Более продвинутая проверка - считаем общие слова
+        let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        
+        if words1.isEmpty || words2.isEmpty {
+            return 0.1 // Return a small non-zero if one has words and the other doesn't after split, but were non-empty initially
+        }
+        
+        let commonWords = words1.intersection(words2)
+        let similarity = Double(commonWords.count) / Double(max(words1.count, words2.count))
+        
+        return similarity
+    }
+    
     // Get a list of all supported locales with their display names
     func getSupportedLocalesWithNames() -> [(Locale, String)] {
         return availableLocales.map { locale in
@@ -183,22 +224,46 @@ class SpeechRecognizerService: ObservableObject {
     
     // Check if the new transcription is significantly different from the previous one
     private func checkAndSaveSignificantChange(newText: String) {
-        // Если текст существенно короче предыдущего, это может означать сброс Apple Speech
-        if previousRecognizedText.count > 0 && 
-           previousRecognizedText.count - newText.count > significantChangeThreshold {
-            // Сохраняем предыдущую транскрипцию в историю
-            if !previousRecognizedText.isEmpty {
-                transcriptionHistory.append(previousRecognizedText)
-            }
-        } 
-        // Или если текст стал значительно длиннее, сохраняем промежуточный результат
-        else if newText.count - previousRecognizedText.count > 30 {
-            if !previousRecognizedText.isEmpty {
-                transcriptionHistory.append(previousRecognizedText)
+        let trimmedOldText = previousRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNewText = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let shortTextMaxLength = 10 // Max length for a text to be considered "short"
+        let similarityThresholdForShortText = 0.2 // Stricter threshold for short texts
+        let similarityThresholdForLongText = 0.5 // Regular threshold for longer texts
+
+        if !trimmedOldText.isEmpty && !trimmedNewText.isEmpty {
+            // Check for divergence: neither text is a prefix of the other.
+            if !trimmedNewText.hasPrefix(trimmedOldText) && !trimmedOldText.hasPrefix(trimmedNewText) {
+                let similarity = calculateTextSimilarity(trimmedOldText, trimmedNewText)
+                // Log the similarity and which threshold will be used
+                var effectiveThreshold = similarityThresholdForLongText
+                var textCategory = "long"
+                if trimmedOldText.count < shortTextMaxLength {
+                    effectiveThreshold = similarityThresholdForShortText
+                    textCategory = "short"
+                }
+                print("Similarity: \(String(format: "%.2f", similarity)) for old ('\(textCategory)' text): '\(trimmedOldText)' | new: '\(trimmedNewText)'. Effective threshold: \(effectiveThreshold)")
+
+                var shouldSaveOldText = false
+                if trimmedOldText.count < shortTextMaxLength {
+                    if similarity < similarityThresholdForShortText {
+                        shouldSaveOldText = true
+                    }
+                } else {
+                    if similarity < similarityThresholdForLongText {
+                        shouldSaveOldText = true
+                    }
+                }
+
+                if shouldSaveOldText {
+                    if transcriptionHistory.last != trimmedOldText {
+                        transcriptionHistory.append(trimmedOldText)
+                        print("History added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
+                    }
+                }
             }
         }
-        
-        previousRecognizedText = newText
+        previousRecognizedText = newText // Always update to the latest text from the recognizer
     }
     
     // Получение полной истории транскрипций
