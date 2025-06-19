@@ -8,6 +8,7 @@ enum AppError: Error, LocalizedError {
     case deviceNotAvailable
     case coreAudioError(Int, String)
     case unknownError(String)
+    case noSpeechEngineSelected
     
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,8 @@ enum AppError: Error, LocalizedError {
             return "Audio device not available. Please check your audio input settings and ensure BlackHole is properly configured."
         case .coreAudioError(let code, let message):
             return "Audio system error (\(code)): \(message)"
+        case .noSpeechEngineSelected:
+            return "No speech recognition engine selected. Please select at least one engine."
         case .unknownError(let message):
             return "Unknown error: \(message)"
         }

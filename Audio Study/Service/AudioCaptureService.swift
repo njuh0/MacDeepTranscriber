@@ -18,10 +18,22 @@ class AudioCaptureService: ObservableObject {
     @Published var modelLoadingStatus: String = "Ready"
     @Published var transcriptionList: [String] = []
     
-    // Speech engine options
-    @Published var useAppleSpeechInParallel: Bool = false
+    // Speech engine selection
+    @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.whisperKit]
     @Published var appleSpeechText: String = ""
-    @Published var appleSpeechHistory: [String] = [] // История транскрипций Apple Speech
+    @Published var appleSpeechHistory: [String] = []
+    
+    // Old property kept for compatibility during refactoring
+    var useAppleSpeechInParallel: Bool {
+        get { selectedSpeechEngines.contains(.appleSpeech) }
+        set {
+            if newValue {
+                selectedSpeechEngines.insert(.appleSpeech)
+            } else {
+                selectedSpeechEngines.remove(.appleSpeech)
+            }
+        }
+    }
     
     // WhisperKit Configuration
     @Published var whisperTranscriptionInterval: TimeInterval = 15.0
@@ -154,18 +166,36 @@ class AudioCaptureService: ObservableObject {
         isSpeechRecognitionAvailable = whisperKitService.isAvailable
     }
     
-    // Method to toggle Apple Speech parallel processing
-    func toggleAppleSpeechParallel(_ enabled: Bool) {
-        useAppleSpeechInParallel = enabled
+    // Method to update selected speech engines
+    func updateSelectedSpeechEngines(_ engines: Set<SpeechEngineType>) {
+        let previousEngines = selectedSpeechEngines
+        selectedSpeechEngines = engines
         
-        // If we're currently capturing and enabling Apple Speech, start it
-        if isCapturing && enabled {
-            startAppleSpeech()
-        } 
-        // If we're currently capturing and disabling Apple Speech, stop it
-        else if isCapturing && !enabled {
-            stopAppleSpeech()
+        // Handle Apple Speech changes if we're already capturing
+        if isCapturing {
+            let wasAppleSpeechEnabled = previousEngines.contains(.appleSpeech)
+            let isAppleSpeechEnabled = engines.contains(.appleSpeech)
+            
+            // Start Apple Speech if newly enabled
+            if !wasAppleSpeechEnabled && isAppleSpeechEnabled {
+                startAppleSpeech()
+            }
+            // Stop Apple Speech if newly disabled
+            else if wasAppleSpeechEnabled && !isAppleSpeechEnabled {
+                stopAppleSpeech()
+            }
         }
+    }
+    
+    // For backward compatibility
+    func toggleAppleSpeechParallel(_ enabled: Bool) {
+        var engines = selectedSpeechEngines
+        if enabled {
+            engines.insert(.appleSpeech)
+        } else {
+            engines.remove(.appleSpeech)
+        }
+        updateSelectedSpeechEngines(engines)
     }
     
 
@@ -230,16 +260,27 @@ class AudioCaptureService: ObservableObject {
         }
 
         do {
+            // Verify at least one engine is selected
+            if selectedSpeechEngines.isEmpty {
+                throw AppError.noSpeechEngineSelected
+            }
+            
             // Clear previous text
             recognizedText = ""
             appleSpeechText = ""
             errorMessage = nil
             
-            // Always start WhisperKit as primary engine
-            try startWhisperKitCapture()
+            // Configure audio engine for all engines to use
+            try configureAudioEngine()
+            let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
             
-            // Start Apple Speech if enabled
-            if useAppleSpeechInParallel {
+            // Start selected engines
+            if selectedSpeechEngines.contains(.whisperKit) {
+                try whisperKitService.startRecognition(audioFormat: recordingFormat)
+                statusMessage = "WhisperKit active. Processing..."
+            }
+            
+            if selectedSpeechEngines.contains(.appleSpeech) {
                 try startAppleSpeechCapture()
             }
             
@@ -259,6 +300,8 @@ class AudioCaptureService: ObservableObject {
                     statusMessage = "⚠️ Microphone access denied"
                 case .coreAudioError(let code, _):
                     statusMessage = "⚠️ CoreAudio error (\(code)). Try restarting your app"
+                case .noSpeechEngineSelected:
+                    statusMessage = "⚠️ Please select at least one speech engine"
                 default:
                     statusMessage = "⚠️ Failed to start audio capture"
                 }
@@ -277,11 +320,12 @@ class AudioCaptureService: ObservableObject {
     func stopCapture() {
         guard isCapturing else { return }
 
-        // Always stop WhisperKit
-        whisperKitService.stopRecognition()
+        // Stop active engines based on selection
+        if selectedSpeechEngines.contains(.whisperKit) {
+            whisperKitService.stopRecognition()
+        }
         
-        // Stop Apple Speech if it was enabled
-        if useAppleSpeechInParallel {
+        if selectedSpeechEngines.contains(.appleSpeech) {
             speechRecognizerService.stopRecognition()
         }
 
