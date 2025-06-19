@@ -2,7 +2,6 @@ import Foundation
 import AVFoundation
 import Combine
 import WhisperKit // Uncomment when WhisperKit package is properly added
-
 enum WhisperKitError: Error, LocalizedError {
     case modelNotLoaded
     case audioProcessingFailed
@@ -56,6 +55,7 @@ class WhisperKitService: ObservableObject {
     private var lastProcessedBufferCount: Int = 0
     private var lastTranscriptionLength: Int = 0  // Track length of last transcription to detect new content
     private var lastContextTranscription: String = ""  // Store last context transcription for comparison
+    private var lastBufferResetTime: Date = Date()  // Время последнего сброса или очистки буфера
     
     @Published var transcriptionList: [String] = []
     
@@ -185,6 +185,7 @@ class WhisperKitService: ObservableObject {
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
         lastContextTranscription = ""
+        lastBufferResetTime = Date() // Инициализируем время сброса буфера
         
         // Start periodic transcription
         startPeriodicTranscription()
@@ -214,6 +215,9 @@ class WhisperKitService: ObservableObject {
         // Adjust the processed buffer count when we remove old buffers
         if removedCount > 0 {
             lastProcessedBufferCount = max(0, lastProcessedBufferCount - removedCount)
+            // Обновляем время сброса буфера, так как старые данные были удалены
+            lastBufferResetTime = Date()
+            print("🧹 Buffer reset: removed \(removedCount) old buffers")
         }
     }
     
@@ -231,6 +235,7 @@ class WhisperKitService: ObservableObject {
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
         lastContextTranscription = ""
+        lastBufferResetTime = Date() // Сбрасываем время буфера при остановке
                 
         print("WhisperKit recognition stopped")
     }
@@ -323,37 +328,42 @@ class WhisperKitService: ObservableObject {
             // Update UI on main thread - use smart transcription replacement
             self.isProcessing = false
             if !transcription.isEmpty {
-                let previousAccumulated = accumulatedText
-                
                 // Use the current transcription as the new accumulated text
                 // WhisperKit's context windows provide the best available transcription
                 accumulatedText = transcription
                 
-                // Only preserve previous text if current transcription is significantly shorter
-                // and appears to be missing substantial content (likely a processing error)
-                if !previousAccumulated.isEmpty &&
-                   transcription.count < Int(Double(previousAccumulated.count) * 0.6) &&
-                   previousAccumulated.count > 100 {
-                    
-                    // Check if current transcription seems to be a truncated version
-                    let cleanPrevious = previousAccumulated.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                    let cleanCurrent = transcription.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    // If current is contained in previous and much shorter, keep previous
-                    if cleanPrevious.contains(cleanCurrent) && cleanCurrent.count < Int(Double(cleanPrevious.count) * 0.8) {
-                        accumulatedText = previousAccumulated
-                        print("🎵 Keeping previous transcription (current seems truncated): \(previousAccumulated.count) chars vs \(transcription.count) chars")
-                    } else {
-                        // Buffer reset detected - archive the previous text
-                if !previousAccumulated.isEmpty && previousAccumulated.count > 50 {
-                        self.transcriptionList.append(previousAccumulated)
-                        print("🗄️ Archived previous text due to buffer reset: \(previousAccumulated.count) chars")
+                // Get clean versions of transcriptions for comparison
+                let cleanTranscription = transcription.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                let timeSinceBufferReset = Date().timeIntervalSince(lastBufferResetTime)
+                // preventing random sudden changes as much as possible. Saving model only at the last moment
+                let canAddTranscription = timeSinceBufferReset > maxBufferDuration * 0.90
+                print("Buffer reset time: \(String(format: "%.1f", timeSinceBufferReset))s, max buffer duration: \(String(format: "%.1f", maxBufferDuration))s")
+       
+                if canAddTranscription {
+                    if !self.transcriptionList.isEmpty {
+                        let lastIndex = self.transcriptionList.count - 1
+                        let lastTranscription = self.transcriptionList[lastIndex]
+                        let cleanLastTranscription = lastTranscription.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        // Similarity too low - randomly cuts off part of string.
+                        // Similaroty too high - randomly may add uncomplited string
+                        let similarity = calculateTextSimilarity(cleanTranscription, cleanLastTranscription)
+                        print("🔍 Similarity: \(String(format: "%.2f", similarity))")
+                        if similarity > 0.5 {
+                            // Если тексты похожи и находятся в пределах maxBufferDuration
+                            self.transcriptionList[lastIndex] = transcription
+                            print("🔄 Updated last transcription with more complete version: \(transcription.count) chars")
+                        } else {
+                            self.transcriptionList.append(accumulatedText)
+                        }
+                    } else{
+                        // Список пуст, просто добавляем первую запись
+                        self.transcriptionList.append(accumulatedText)
+                        print("➕ Added first transcription to list: \(accumulatedText.count) chars")
+                    }
                 }
-                print("🎵 Using new transcription: \(accumulatedText)")   
-                }
-                } else {
-                    print("🎵 Full context transcription: \(accumulatedText)")
-                }                
+                print("🎵 Current transcription: \(accumulatedText.count) chars")
                 self.onRecognitionResult?(accumulatedText)
             }
             
@@ -476,7 +486,7 @@ class WhisperKitService: ObservableObject {
             print("🎵 Processing audio: \(processedAudio.count) samples at \(targetSampleRate)Hz")
             
             // Transcribe using WhisperKit with audioArray method
-            let results = try await whisperKit.transcribe(audioArray: processedAudio, decodeOptions: DecodingOptions(task: .transcribe, language: "ru"))
+            let results = try await whisperKit.transcribe(audioArray: processedAudio, decodeOptions: DecodingOptions(task: .transcribe, language: "en"))
             
             // Extract text from first result (WhisperKit returns [TranscriptionResult])
             let transcription = results.first?.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) ?? ""
@@ -566,6 +576,106 @@ extension WhisperKitService {
         // Load new model
         Task {
             await loadWhisperModel()
+        }
+    }
+    
+    // Функция для расчета схожести двух текстов
+    private func calculateTextSimilarity(_ text1: String, _ text2: String) -> Double {
+        // Если один из текстов пустой, возвращаем 0
+        if text1.isEmpty || text2.isEmpty {
+            return 0.0
+        }
+        
+        // Если тексты идентичны, возвращаем 1
+        if text1 == text2 {
+            return 1.0
+        }
+        
+        // Простой алгоритм - проверяем содержание одного текста в другом
+        if text1.count > text2.count {
+            if text1.contains(text2) {
+                return Double(text2.count) / Double(text1.count)
+            }
+        } else {
+            if text2.contains(text1) {
+                return Double(text1.count) / Double(text2.count)
+            }
+        }
+        
+        // Более продвинутая проверка - считаем общие слова
+        let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        
+        if words1.isEmpty || words2.isEmpty {
+            return 0.1
+        }
+        
+        let commonWords = words1.intersection(words2)
+        let similarity = Double(commonWords.count) / Double(max(words1.count, words2.count))
+        
+        return similarity
+    }
+}
+
+// MARK: - AVAudioEngine Error Handling
+extension AVAudioEngine {
+    /// Safely starts the audio engine with proper error handling for HAL errors
+    func safeStart() throws {
+        do {
+            try self.start()
+        } catch {
+            // Handle specific CoreAudio errors
+            let nsError = error as NSError
+            if nsError.domain == NSOSStatusErrorDomain {
+                // Common CoreAudio error codes
+                switch nsError.code {
+                case -10877: // kAudioHardwareNotRunningError
+                    print("🔊 Audio Hardware Error: Device not available or running (-10877)")
+                    throw AppError.deviceNotAvailable
+                    
+                case -10875: // kAudioHardwareUnspecifiedError
+                    print("🔊 Audio Hardware Error: Unspecified hardware error (-10875)")
+                    throw AppError.coreAudioError(nsError.code, "Hardware error")
+                    
+                case -10851: // kAudioHardwareUnsupportedOperationError
+                    print("🔊 Audio Hardware Error: Unsupported operation (-10851)")
+                    throw AppError.coreAudioError(nsError.code, "Unsupported operation")
+                    
+                default:
+                    print("🔊 Audio Hardware Error: \(nsError.code)")
+                    throw AppError.coreAudioError(nsError.code, "Unknown audio error")
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+}
+
+// Add comprehensive CoreAudio error code mapping
+extension AppError {
+    static func mapCoreAudioErrorCode(_ code: Int) -> String {
+        switch code {
+        case -10877:
+            return "Audio device not available or not running. Check that your audio device is properly connected and that no other app is using it exclusively."
+        case -10875:
+            return "Unspecified audio hardware error. Try restarting your Mac or reconnecting your audio devices."
+        case -10851:
+            return "Unsupported audio operation. Your current audio configuration may not be compatible."
+        case -10879:
+            return "Audio device not found. Check your audio hardware connections."
+        case -10878:
+            return "Audio device is busy. Another application may be using the audio device exclusively."
+        case -10876:
+            return "Audio hardware initialization failed."
+        case -10868:
+            return "Audio hardware stream format error."
+        case -10867:
+            return "Audio hardware is in use by another application."
+        case -10866:
+            return "Audio hardware IO operation aborted."
+        default:
+            return "CoreAudio error \(code). Check your audio hardware and settings."
         }
     }
 }

@@ -1109,7 +1109,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Model/AppError.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift"
         },
         {
           "kind" : "file",
@@ -1134,7 +1142,9 @@
       "objects" : [
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/Audio_StudyApp.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/ContentView.swift.o",
+        "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AppError.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.swift.o",
+        "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.swift.o",
         "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/WhisperKitService.swift.o"
       ],
       "otherArguments" : [
@@ -1204,7 +1214,9 @@
       "sources" : [
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Audio_StudyApp.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/ContentView.swift",
+        "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Model/AppError.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift",
+        "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift",
         "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift"
       ],
       "tempsPath" : "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build",
@@ -6083,7 +6095,9 @@
       "-c",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Audio_StudyApp.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/ContentView.swift",
+      "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Model/AppError.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift",
+      "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift",
       "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift",
       "-I",
       "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/Modules",
@@ -8357,7 +8371,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Model/AppError.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift"
         },
         {
           "kind" : "file",

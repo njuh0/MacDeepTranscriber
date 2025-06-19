@@ -14,11 +14,23 @@
     "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/ContentView~partial.swiftmodule",
     "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/ContentView.swiftdeps"
   },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Model/AppError.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AppError.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AppError.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AppError~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AppError.swiftdeps"
+  },
   "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/AudioCaptureService.swift": {
     "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.d",
     "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.swift.o",
     "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService~partial.swiftmodule",
     "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/AudioCaptureService.swiftdeps"
+  },
+  "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/SpeechEngineType.swift": {
+    "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.d",
+    "object": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.swift.o",
+    "swiftmodule": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType~partial.swiftmodule",
+    "swift-dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/SpeechEngineType.swiftdeps"
   },
   "/Users/njuh/Megadev/swift-dev/Audio Study/Audio Study/Service/WhisperKitService.swift": {
     "dependencies": "/Users/njuh/Megadev/swift-dev/Audio Study/.build/index-build/arm64-apple-macosx/debug/AudioStudy.build/WhisperKitService.d",

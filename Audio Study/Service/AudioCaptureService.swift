@@ -170,6 +170,28 @@ class AudioCaptureService: ObservableObject {
             isCapturing = false
             stopCapture()
             
+            // Handle specific errors with user-friendly messages
+            if let appError = error as? AppError {
+                errorMessage = appError.errorDescription
+                
+                switch appError {
+                case .deviceNotAvailable:
+                    statusMessage = "⚠️ Audio device error: Please check your audio input settings"
+                case .microphonePermissionDenied:
+                    statusMessage = "⚠️ Microphone access denied"
+                case .coreAudioError(let code, _):
+                    statusMessage = "⚠️ CoreAudio error (\(code)). Try restarting your app"
+                default:
+                    statusMessage = "⚠️ Failed to start audio capture"
+                }
+            } else if let whisperError = error as? WhisperKitError {
+                errorMessage = whisperError.localizedDescription
+                statusMessage = "⚠️ WhisperKit error"
+            } else {
+                errorMessage = error.localizedDescription
+                statusMessage = "⚠️ Failed to start audio capture"
+            }
+            
             print("Error starting capture: \(error.localizedDescription)")
         }
     }
@@ -204,6 +226,7 @@ class AudioCaptureService: ObservableObject {
         
         if inputNode.numberOfInputs == 0 {
             print("Error: InputNode has no inputs. BlackHole might not be selected as system input.")
+            throw AppError.deviceNotAvailable
         }
 
         let recordingFormat: AVAudioFormat
@@ -229,14 +252,35 @@ class AudioCaptureService: ObservableObject {
         
         do {
             print("Starting AVAudioEngine...")
-            try engine.start()
+            try engine.safeStart() // Use our custom safe start method
             print("AVAudioEngine started successfully.")
         } catch {
             let nsError = error as NSError
+            
+            // Handle permission errors
             if nsError.domain == NSPOSIXErrorDomain && nsError.code == 13 {
                 print("Error starting AVAudioEngine: Permission denied (Microphone access).")
+                throw AppError.microphonePermissionDenied
+            } 
+            // Handle CoreAudio specific errors
+            else if nsError.domain == NSOSStatusErrorDomain {
+                switch nsError.code {
+                case -10877: // kAudioHardwareNotRunningError
+                    print("🔊 Audio Hardware Error: Device not available or running (-10877)")
+                    throw AppError.deviceNotAvailable
+                case -10875: // kAudioHardwareUnspecifiedError
+                    print("🔊 Audio Hardware Error: Unspecified hardware error (-10875)")
+                    throw AppError.coreAudioError(nsError.code, "Hardware error")
+                case -10851: // kAudioHardwareUnsupportedOperationError
+                    print("🔊 Audio Hardware Error: Unsupported operation (-10851)")
+                    throw AppError.coreAudioError(nsError.code, "Unsupported operation")
+                default:
+                    print("🔊 CoreAudio Error: \(nsError.code)")
+                    throw AppError.coreAudioError(nsError.code, "Unknown audio error")
+                }
             } else {
                 print("Fatal Error starting AVAudioEngine: \(nsError.localizedDescription) (Domain: \(nsError.domain), Code: \(nsError.code))")
+                throw AppError.audioSessionError("Audio engine failed to start: \(nsError.localizedDescription)")
             }
         }
     }
