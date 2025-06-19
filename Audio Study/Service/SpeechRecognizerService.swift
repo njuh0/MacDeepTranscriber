@@ -7,9 +7,13 @@ import Combine
 class SpeechRecognizerService: ObservableObject {
     @Published var isRecognizing: Bool = false
     @Published var recognizedText: String = ""
+    @Published var transcriptionHistory: [String] = [] // Добавляем историю транскрипций
     @Published var errorMessage: String?
     @Published var isAvailable: Bool = false
     @Published var selectedLocale: Locale = Locale(identifier: "en-US")
+    
+    private var previousRecognizedText: String = "" // Для отслеживания изменений
+    private var significantChangeThreshold: Int = 5 // Минимальная разница в символах для сохранения
     
     // For handling continuous recognition
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -119,10 +123,20 @@ class SpeechRecognizerService: ObservableObject {
                 
                 if let result = result {
                     let text = result.bestTranscription.formattedString
+                    if(text.isEmpty){
+                        print("No recognized text")
+                    }
+                    // Проверяем и сохраняем значительные изменения
+                    self.checkAndSaveSignificantChange(newText: text)
                     self.recognizedText = text
                 }
                 
                 if result?.isFinal == true {
+                    // Сохраняем финальный результат
+                    if let finalText = result?.bestTranscription.formattedString,
+                       !finalText.isEmpty {
+                        self.transcriptionHistory.append(finalText)
+                    }
                     self.stopRecognition()
                 }
             }
@@ -133,6 +147,12 @@ class SpeechRecognizerService: ObservableObject {
     }
     
     func stopRecognition() {
+        // Сохраняем текущий текст в историю, если он не пустой
+        if !recognizedText.isEmpty && 
+           (transcriptionHistory.isEmpty || transcriptionHistory.last != recognizedText) {
+            transcriptionHistory.append(recognizedText)
+        }
+        
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         
@@ -145,8 +165,12 @@ class SpeechRecognizerService: ObservableObject {
         isRecognizing = false
     }
     
-    func clearRecognizedText() {
+    func clearRecognizedText(clearHistory: Bool = false) {
         recognizedText = ""
+        previousRecognizedText = ""
+        if clearHistory {
+            transcriptionHistory = []
+        }
     }
     
     // Get a list of all supported locales with their display names
@@ -155,5 +179,30 @@ class SpeechRecognizerService: ObservableObject {
             let displayName = (locale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
             return (locale, displayName)
         }.sorted { $0.1 < $1.1 }
+    }
+    
+    // Check if the new transcription is significantly different from the previous one
+    private func checkAndSaveSignificantChange(newText: String) {
+        // Если текст существенно короче предыдущего, это может означать сброс Apple Speech
+        if previousRecognizedText.count > 0 && 
+           previousRecognizedText.count - newText.count > significantChangeThreshold {
+            // Сохраняем предыдущую транскрипцию в историю
+            if !previousRecognizedText.isEmpty {
+                transcriptionHistory.append(previousRecognizedText)
+            }
+        } 
+        // Или если текст стал значительно длиннее, сохраняем промежуточный результат
+        else if newText.count - previousRecognizedText.count > 30 {
+            if !previousRecognizedText.isEmpty {
+                transcriptionHistory.append(previousRecognizedText)
+            }
+        }
+        
+        previousRecognizedText = newText
+    }
+    
+    // Получение полной истории транскрипций
+    func getFullTranscriptionHistory() -> String {
+        return transcriptionHistory.joined(separator: "\n")
     }
 }

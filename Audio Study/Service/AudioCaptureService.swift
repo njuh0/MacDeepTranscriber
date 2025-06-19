@@ -21,6 +21,7 @@ class AudioCaptureService: ObservableObject {
     // Speech engine options
     @Published var useAppleSpeechInParallel: Bool = false
     @Published var appleSpeechText: String = ""
+    @Published var appleSpeechHistory: [String] = [] // История транскрипций Apple Speech
     
     // WhisperKit Configuration
     @Published var whisperTranscriptionInterval: TimeInterval = 15.0
@@ -90,6 +91,13 @@ class AudioCaptureService: ObservableObject {
             .sink { [weak self] text in
                 // Always store in appleSpeechText
                 self?.appleSpeechText = text
+            }
+            .store(in: &cancellables)
+            
+        speechRecognizerService.$transcriptionHistory
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] history in
+                self?.appleSpeechHistory = history
             }
             .store(in: &cancellables)
             
@@ -196,7 +204,18 @@ class AudioCaptureService: ObservableObject {
     
     func clearRecognizedText() {
         recognizedText = ""
+        appleSpeechText = ""
         statusMessage = "Transcription text cleared."
+        
+        // Опционально очищаем также историю Apple Speech
+        if useAppleSpeechInParallel {
+            speechRecognizerService.clearRecognizedText(clearHistory: false)
+        }
+    }
+    
+    // Метод для очистки истории Apple Speech
+    func clearAppleSpeechHistory() {
+        speechRecognizerService.clearRecognizedText(clearHistory: true)
     }
     
     func clearTranscriptionList() {

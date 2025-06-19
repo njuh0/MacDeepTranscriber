@@ -58,6 +58,7 @@ struct ErrorBannerView: View {
 
 struct ContentView: View {
     @StateObject private var audioCaptureService = AudioCaptureService()  // Simpler initialization
+    @State private var selectedHistoryTab: Int = 0  // 0 - WhisperKit, 1 - Apple Speech
 
     var body: some View {
         VStack {
@@ -345,27 +346,84 @@ struct ContentView: View {
             Text("Previous Transcriptions")
                 .font(.headline)
                 .foregroundColor(.cyan)
+            
+            // Tabs for switching between WhisperKit and Apple Speech history
+            if audioCaptureService.useAppleSpeechInParallel {
+                Picker("Transcription History", selection: Binding(
+                    get: { self.selectedHistoryTab },
+                    set: { self.selectedHistoryTab = $0 }
+                )) {
+                    Text("WhisperKit History").tag(0)
+                    Text("Apple Speech History").tag(1)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+            
+            if audioCaptureService.useAppleSpeechInParallel {
+                HStack {
+                    Text(selectedHistoryTab == 0 ? "WhisperKit Segments:" : "Apple Speech History:")
+                        .font(.subheadline)
+                        .foregroundColor(selectedHistoryTab == 0 ? .blue : .green)
+                    Spacer()
+                }
+                .padding(.horizontal)
+            } else {
+                HStack {
+                    Text("WhisperKit Segments:")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                    Spacer()
+                }
+                .padding(.horizontal)
+            }
 
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 4) {
-                    if audioCaptureService.transcriptionList.isEmpty {
-                        Text("No previous transcriptions yet.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(8)
-                    } else {
-                        ForEach(
-                            audioCaptureService.transcriptionList.reversed(),
-                            id: \.self
-                        ) { text in
-                            Text(text)
+                    if selectedHistoryTab == 0 {
+                        // WhisperKit History
+                        if audioCaptureService.transcriptionList.isEmpty {
+                            Text("No WhisperKit transcriptions yet.")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
                                 .padding(8)
-                                .background(
-                                    Color(NSColor.controlBackgroundColor)
-                                )
-                                .cornerRadius(8)
-                                .textSelection(.enabled)
+                        } else {
+                            ForEach(
+                                audioCaptureService.transcriptionList.reversed(),
+                                id: \.self
+                            ) { text in
+                                Text(text)
+                                    .font(.caption)
+                                    .padding(8)
+                                    .background(
+                                        Color(NSColor.controlBackgroundColor)
+                                    )
+                                    .cornerRadius(8)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    } else {
+                        // Apple Speech History
+                        if audioCaptureService.appleSpeechHistory.isEmpty {
+                            Text("No Apple Speech history yet.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(8)
+                        } else {
+                            ForEach(
+                                audioCaptureService.appleSpeechHistory.reversed(),
+                                id: \.self
+                            ) { text in
+                                Text(text)
+                                    .font(.caption)
+                                    .padding(8)
+                                    .background(
+                                        Color(NSColor.controlBackgroundColor)
+                                    )
+                                    .cornerRadius(8)
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
                 }
@@ -373,17 +431,29 @@ struct ContentView: View {
             .frame(maxHeight: 200)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.cyan, lineWidth: 1)
+                    .stroke(selectedHistoryTab == 0 ? Color.cyan : Color.green, lineWidth: 1)
             )
         }
         .padding(.horizontal)
         .padding(.bottom)
 
-        // Clear text button
-        if !audioCaptureService.recognizedText.isEmpty {
+        // Clear text and history buttons
+        if !audioCaptureService.recognizedText.isEmpty || 
+           !audioCaptureService.appleSpeechText.isEmpty ||
+           !audioCaptureService.transcriptionList.isEmpty ||
+           !audioCaptureService.appleSpeechHistory.isEmpty {
             HStack {
+                if !audioCaptureService.appleSpeechHistory.isEmpty && audioCaptureService.useAppleSpeechInParallel {
+                    Button("Clear Apple Speech History") {
+                        audioCaptureService.clearAppleSpeechHistory()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(.green)
+                }
+                
                 Spacer()
-                Button("Clear Text") {
+                
+                Button("Clear Current Text") {
                     audioCaptureService.clearRecognizedText()
                 }
                 .buttonStyle(.bordered)
