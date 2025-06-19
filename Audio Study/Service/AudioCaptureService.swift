@@ -16,7 +16,7 @@ class AudioCaptureService: ObservableObject {
     @Published var isModelLoaded: Bool = false
     @Published var selectedWhisperModel: String = "base"
     @Published var modelLoadingStatus: String = "Ready"
- @Published var transcriptionList: [TranscriptionEntry] = []
+    @Published var transcriptionList: [TranscriptionEntry] = []
     
     // Speech engine selection
     @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.whisperKit]
@@ -102,10 +102,26 @@ class AudioCaptureService: ObservableObject {
             }
             .store(in: &cancellables)
             
-        speechRecognizerService.$transcriptionHistory // This is the property that needs to be observed
+        // Subscribe to WhisperKit transcription history (permanent storage)
+        whisperKitService.$transcriptionList
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (history: [TranscriptionEntry]) in // Correctly expect [TranscriptionEntry]
-                self?.transcriptionList = history // Assign to the correct property
+            .sink { [weak self] (permanentHistory: [TranscriptionEntry]) in
+                self?.updateWhisperKitDisplayList()
+            }
+            .store(in: &cancellables)
+            
+        // Subscribe to WhisperKit session transcriptions (temporary during recording)
+        whisperKitService.$sessionTranscriptions
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (sessionHistory: [TranscriptionEntry]) in
+                self?.updateWhisperKitDisplayList()
+            }
+            .store(in: &cancellables)
+            
+        speechRecognizerService.$sessionTranscriptions // Apple Speech session history
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (sessionHistory: [TranscriptionEntry]) in
+                self?.updateAppleSpeechDisplayList()
             }
             .store(in: &cancellables)
             
@@ -128,6 +144,10 @@ class AudioCaptureService: ObservableObject {
             // Sync initial configuration values
             updateWhisperTranscriptionInterval(whisperTranscriptionInterval)
             updateWhisperMaxBufferDuration(whisperMaxBufferDuration)
+            
+            // Initialize display lists
+            updateWhisperKitDisplayList()
+            updateAppleSpeechDisplayList()
         }
     }
     
@@ -241,8 +261,19 @@ class AudioCaptureService: ObservableObject {
     
     // Метод для очистки истории Apple Speech
     func clearAppleSpeechHistory() {
-        speechRecognizerService.clearRecognizedText(clearHistory: true)
+        speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
+    
+    // Method to clear duplicates in Apple Speech history
+    func cleanupAppleSpeechDuplicates() {
+        speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
+    }
+    
+    // Method to clear transcription history
+    func clearTranscriptionHistory() {
+        transcriptionList = []
+    }
+    
     
     func clearTranscriptionList() {
         transcriptionList = []
@@ -261,10 +292,8 @@ class AudioCaptureService: ObservableObject {
                 throw AppError.noSpeechEngineSelected
             }
             
-            // Clear previous text
-            recognizedText = ""
-            appleSpeechText = ""
-            errorMessage = nil
+            // Start a new session (clears previous session data)
+            startNewSession()
             
             // Configure audio engine for all engines to use
             try configureAudioEngine()
@@ -316,26 +345,44 @@ class AudioCaptureService: ObservableObject {
     func stopCapture() {
         guard isCapturing else { return }
 
-        // Stop active engines based on selection
+        print("🛑 AudioCaptureService: Starting stopCapture process...")
+        
+        // Stop active engines first to ensure final transcriptions are captured
         if selectedSpeechEngines.contains(.whisperKit) {
+            print("🛑 Stopping WhisperKit recognition...")
             whisperKitService.stopRecognition()
+            print("✅ WhisperKit stopped. Session count: \(whisperKitService.sessionTranscriptions.count)")
         }
         
         if selectedSpeechEngines.contains(.appleSpeech) {
+            print("🛑 Stopping Apple Speech recognition...")
             speechRecognizerService.stopRecognition()
+            print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
         }
 
-        // Stop audio engine in any case
-        if let engine = audioEngine {
-            engine.stop()
-            if engine.inputNode.numberOfInputs > 0 {
-                engine.inputNode.removeTap(onBus: 0)
+        // Small delay to ensure any final async operations complete
+        Task {
+            // Wait a brief moment for any final transcriptions to be processed
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            await MainActor.run {
+                // Now save session transcriptions to permanent storage after stopping
+                print("💾 Saving session transcriptions to permanent storage...")
+                self.saveSessionToPermanentStorage()
+                
+                // Stop audio engine in any case
+                if let engine = self.audioEngine {
+                    engine.stop()
+                    if engine.inputNode.numberOfInputs > 0 {
+                        engine.inputNode.removeTap(onBus: 0)
+                    }
+                }
+                self.audioEngine = nil
+
+                self.isCapturing = false
+                print("✅ Capture stopped and session saved.")
             }
         }
-        audioEngine = nil
-
-        isCapturing = false
-        print("Capture stopped.")
     }
     
     // Helper methods for Apple Speech
@@ -467,5 +514,64 @@ class AudioCaptureService: ObservableObject {
         }
         selectedLocale = locale
         speechRecognizerService.changeLocale(to: locale)
+    }
+    
+    // MARK: - Session Management
+    
+    func saveSessionToPermanentStorage() {
+        print("💾 AudioCaptureService: Starting saveSessionToPermanentStorage...")
+        
+        // Save WhisperKit session transcriptions
+        if selectedSpeechEngines.contains(.whisperKit) {
+            let sessionCount = whisperKitService.sessionTranscriptions.count
+            print("💾 Saving \(sessionCount) WhisperKit session transcriptions...")
+            whisperKitService.saveSessionToPermanentStorage()
+        }
+        
+        // Save Apple Speech session transcriptions
+        if selectedSpeechEngines.contains(.appleSpeech) {
+            let sessionCount = speechRecognizerService.sessionTranscriptions.count
+            print("💾 Saving \(sessionCount) Apple Speech session transcriptions...")
+            speechRecognizerService.saveSessionTranscriptionsToPermanentStorage()
+        }
+        
+        print("✅ Session transcriptions saved to permanent storage")
+        statusMessage = "Session transcriptions saved to storage"
+    }
+    
+    func startNewSession() {
+        // Clear session data for WhisperKit
+        if selectedSpeechEngines.contains(.whisperKit) {
+            whisperKitService.clearSession()
+        }
+        
+        // Clear session data for Apple Speech
+        if selectedSpeechEngines.contains(.appleSpeech) {
+            speechRecognizerService.startNewRecordingSession()
+        }
+        
+        // Clear current text
+        recognizedText = ""
+        appleSpeechText = ""
+        errorMessage = nil
+        
+        print("Started new recording session")
+        statusMessage = "New session started"
+    }
+    
+    // Helper method to update WhisperKit display list (combines permanent + session)
+    private func updateWhisperKitDisplayList() {
+        // Combine permanent transcriptions with current session transcriptions
+        let permanentList = whisperKitService.transcriptionList
+        let sessionList = whisperKitService.sessionTranscriptions
+        transcriptionList = permanentList + sessionList
+    }
+    
+    // Helper method to update Apple Speech display list (shows session transcriptions)
+    private func updateAppleSpeechDisplayList() {
+        // For Apple Speech, we show the session transcriptions during recording
+        // (permanent history is handled separately and saved when stopping)
+        let sessionList = speechRecognizerService.sessionTranscriptions
+        appleSpeechHistory = sessionList.map { $0.transcription }
     }
 }

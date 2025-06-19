@@ -56,8 +56,12 @@ class WhisperKitService: ObservableObject {
     private var lastTranscriptionLength: Int = 0  // Track length of last transcription to detect new content
     private var lastContextTranscription: String = ""  // Store last context transcription for comparison
     private var lastBufferResetTime: Date = Date()  // Время последнего сброса или очистки буфера
+    private var isStopping: Bool = false  // Флаг для предотвращения двойного сохранения при остановке
     
     @Published var transcriptionList: [TranscriptionEntry] = [] // Updated type
+    
+    // Session transcriptions (temporary storage during recording)
+    @Published var sessionTranscriptions: [TranscriptionEntry] = []
     
     // WhisperKit instance (will be uncommented when package is added)
     private var whisperKit: WhisperKit?
@@ -261,9 +265,51 @@ class WhisperKitService: ObservableObject {
     }
     
     func stopRecognition() {
+        print("🛑 WhisperKit: stopRecognition called")
+        
+        // Устанавливаем флаг остановки для предотвращения дублирования
+        isStopping = true
+        
         isRecording = false
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
+        
+        // Ensure final transcription is saved (but avoid duplicates)
+        if !accumulatedText.isEmpty {
+            let trimmedFinalText = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if sessionTranscriptions.isEmpty {
+                // No session transcriptions yet, add the final one
+                let finalEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
+                sessionTranscriptions.append(finalEntry)
+                print("💾 WhisperKit: Added final transcription to empty session: \(trimmedFinalText.count) chars")
+            } else {
+                // Check if we need to update the last entry or add a new one
+                let lastEntry = sessionTranscriptions.last!
+                let lastText = lastEntry.transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if lastText != trimmedFinalText {
+                    // Check similarity to decide whether to update or add new
+                    let similarity = calculateTextSimilarity(lastText.lowercased(), trimmedFinalText.lowercased())
+                    
+                    if similarity > 0.7 {
+                        // High similarity - update the last entry with the more complete version
+                        let updatedEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
+                        sessionTranscriptions[sessionTranscriptions.count - 1] = updatedEntry
+                        print("🔄 WhisperKit: Updated last session entry with final transcription: \(trimmedFinalText.count) chars")
+                    } else {
+                        // Low similarity - add as new entry
+                        let finalEntry = TranscriptionEntry(date: Date(), transcription: trimmedFinalText)
+                        sessionTranscriptions.append(finalEntry)
+                        print("➕ WhisperKit: Added new final transcription to session: \(trimmedFinalText.count) chars")
+                    }
+                } else {
+                    print("✅ WhisperKit: Final transcription already matches last session entry")
+                }
+            }
+        } else {
+            print("🚫 WhisperKit: No accumulated text to save")
+        }
         
         bufferLock.lock()
         audioBuffers.removeAll()
@@ -274,9 +320,47 @@ class WhisperKitService: ObservableObject {
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
         lastContextTranscription = ""
-        lastBufferResetTime = Date() // Сбрасываем время буфера при остановке
+        lastBufferResetTime = Date()
+        
+        // Сбрасываем флаг остановки
+        isStopping = false
                 
-        print("WhisperKit recognition stopped")
+        print("✅ WhisperKit recognition stopped. Final session count: \(sessionTranscriptions.count)")
+    }
+    
+    // Вспомогательная функция для определения, нужно ли сохранять транскрипцию
+    private func shouldSaveTranscription(_ newText: String) -> Bool {
+        // Если список пуст, сохраняем первую запись
+        guard !sessionTranscriptions.isEmpty else {
+            return true
+        }
+        
+        let trimmedNewText = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewText.isEmpty else {
+            return false
+        }
+        
+        // Проверяем схожесть с последними несколькими записями, чтобы избежать дублирования
+        let checkCount = min(3, sessionTranscriptions.count) // Проверяем последние 3 записи
+        let recentTranscriptions = Array(sessionTranscriptions.suffix(checkCount))
+        
+        for entry in recentTranscriptions {
+            let existingText = entry.transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Проверяем точное совпадение
+            if trimmedNewText == existingText {
+                return false
+            }
+            
+            // Проверяем схожесть
+            let similarity = calculateTextSimilarity(trimmedNewText.lowercased(), existingText.lowercased())
+            if similarity > 0.8 { // Очень высокая схожесть - скорее всего дубликат
+                print("🔍 High similarity (\(String(format: "%.2f", similarity))) with recent entry, skipping")
+                return false
+            }
+        }
+        
+        return true
     }
     
     private func startPeriodicTranscription() {
@@ -371,39 +455,49 @@ class WhisperKitService: ObservableObject {
                 // WhisperKit's context windows provide the best available transcription
                 accumulatedText = transcription
                 
-                // Get clean versions of transcriptions for comparison
-                let cleanTranscription = transcription.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                
                 let timeSinceBufferReset = Date().timeIntervalSince(lastBufferResetTime)
                 // preventing random sudden changes as much as possible. Saving model only at the last moment
                 let canAddTranscription = timeSinceBufferReset > maxBufferDuration * 0.90
                 print("Buffer reset time: \(String(format: "%.1f", timeSinceBufferReset))s, max buffer duration: \(String(format: "%.1f", maxBufferDuration))s")
        
-                if canAddTranscription {
-                    if !self.transcriptionList.isEmpty {
-                        let lastIndex = self.transcriptionList.count - 1
-                        // Assuming lastTranscription here is used for its textual content for similarity
-                        let lastTranscriptionText = self.transcriptionList[lastIndex].transcription 
-                        let cleanLastTranscription = lastTranscriptionText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                        
-                        let similarity = calculateTextSimilarity(cleanTranscription, cleanLastTranscription)
-                        print("🔍 Similarity: \(String(format: "%.2f", similarity))")
-                        if similarity > 0.5 {
-                            let updatedEntry = TranscriptionEntry(date: Date(), transcription: transcription)
-                            self.transcriptionList[lastIndex] = updatedEntry
-                            self.saveWhisperHistoryToJSON()
-                            print("🔄 Updated last transcription entry with more complete version: \(transcription.count) chars")
-                        } else {
-                            let newEntry = TranscriptionEntry(date: Date(), transcription: accumulatedText) // accumulatedText contains the full new transcription
-                            self.transcriptionList.append(newEntry)
-                            self.saveWhisperHistoryToJSON()
-                        }
+                // Не сохраняем во время остановки, чтобы избежать дублирования
+                if canAddTranscription && !isStopping {
+                    // Проверяем, нужно ли добавлять или обновлять транскрипцию в сессии
+                    let trimmedTranscription = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if sessionTranscriptions.isEmpty {
+                        // Список пуст, добавляем первую запись
+                        let newEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
+                        sessionTranscriptions.append(newEntry)
+                        print("➕ Added first transcription to session: \(trimmedTranscription.count) chars")
                     } else {
-                        // Список пуст, просто добавляем первую запись
-                        let newEntry = TranscriptionEntry(date: Date(), transcription: accumulatedText)
-                        self.transcriptionList.append(newEntry)
-                        self.saveWhisperHistoryToJSON()
-                        print("➕ Added first transcription entry to list: \(accumulatedText.count) chars")
+                        // Есть существующие записи, проверяем последнюю
+                        let lastIndex = sessionTranscriptions.count - 1
+                        let lastEntry = sessionTranscriptions[lastIndex]
+                        let lastText = lastEntry.transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        if lastText != trimmedTranscription {
+                            let similarity = calculateTextSimilarity(lastText.lowercased(), trimmedTranscription.lowercased())
+                            print("🔍 Periodic similarity with last entry: \(String(format: "%.2f", similarity))")
+                            
+                            if similarity > 0.6 {
+                                // Высокая схожесть - обновляем последнюю запись
+                                let updatedEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
+                                sessionTranscriptions[lastIndex] = updatedEntry
+                                print("🔄 Updated last session transcription: \(trimmedTranscription.count) chars")
+                            } else {
+                                // Низкая схожесть - добавляем новую запись, но только если она достаточно отличается
+                                if shouldSaveTranscription(trimmedTranscription) {
+                                    let newEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
+                                    sessionTranscriptions.append(newEntry)
+                                    print("➕ Added new transcription to session: \(trimmedTranscription.count) chars")
+                                } else {
+                                    print("🚫 Skipped adding transcription (too similar to existing entries)")
+                                }
+                            }
+                        } else {
+                            print("✅ Transcription already matches last session entry, no update needed")
+                        }
                     }
                 }
                 print("🎵 Current transcription (accumulatedText): \(accumulatedText.count) chars")
@@ -720,5 +814,64 @@ extension AppError {
         default:
             return "CoreAudio error \(code). Check your audio hardware and settings."
         }
+    }
+}
+
+// MARK: - Session Management
+extension WhisperKitService {
+    
+    func startNewSession() {
+        sessionTranscriptions.removeAll()
+        accumulatedText = ""
+        lastProcessedBufferCount = 0
+        lastTranscriptionLength = 0
+        lastContextTranscription = ""
+        lastBufferResetTime = Date()
+        isStopping = false
+        print("Started new WhisperKit session")
+    }
+    
+    func saveSessionToPermanentStorage() {
+        print("💾 WhisperKit: saveSessionToPermanentStorage called")
+        print("📝 Current session transcriptions count: \(sessionTranscriptions.count)")
+        
+        if !sessionTranscriptions.isEmpty {
+            print("📝 Session transcriptions to save:")
+            for (index, entry) in sessionTranscriptions.enumerated() {
+                print("  \(index + 1). [\(entry.date)] \(entry.transcription.prefix(50))...")
+            }
+        }
+        
+        // Move session transcriptions to permanent history
+        let initialPermanentCount = transcriptionList.count
+        transcriptionList.append(contentsOf: sessionTranscriptions)
+        let finalPermanentCount = transcriptionList.count
+        
+        // Save to JSON file
+        saveWhisperHistoryToJSON()
+        
+        print("✅ Saved \(sessionTranscriptions.count) WhisperKit transcriptions to permanent storage")
+        print("📊 Permanent history: \(initialPermanentCount) → \(finalPermanentCount) entries")
+        
+        // Don't clear session here - keep them visible in UI until new session starts
+        print("👁️ WhisperKit session transcriptions saved but kept visible in UI")
+    }
+    
+    func getSessionTranscriptions() -> [TranscriptionEntry] {
+        return sessionTranscriptions
+    }
+    
+    func clearSession() {
+        sessionTranscriptions.removeAll()
+        accumulatedText = ""
+        lastProcessedBufferCount = 0
+        lastTranscriptionLength = 0
+        lastContextTranscription = ""
+        isStopping = false
+    }
+    
+    // Get all transcriptions (permanent + session) for display
+    func getAllTranscriptions() -> [TranscriptionEntry] {
+        return transcriptionList + sessionTranscriptions
     }
 }

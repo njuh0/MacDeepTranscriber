@@ -7,10 +7,13 @@ import Combine
 class SpeechRecognizerService: ObservableObject {
     @Published var isRecognizing: Bool = false
     @Published var recognizedText: String = ""
-    @Published var transcriptionHistory: [TranscriptionEntry] = [] // Updated type
+    @Published var sessionTranscriptions: [TranscriptionEntry] = [] // Updated type
     @Published var errorMessage: String?
     @Published var isAvailable: Bool = false
     @Published var selectedLocale: Locale = Locale(identifier: "en-US")
+    
+    // Temporary storage during recording session
+    private var permanentHistory: [TranscriptionEntry] = []
     
     private var previousRecognizedText: String = "" // Для отслеживания изменений
     private var significantChangeThreshold: Int = 5 // Минимальная разница в символах для сохранения
@@ -41,8 +44,8 @@ class SpeechRecognizerService: ObservableObject {
         encoder.outputFormatting = .prettyPrinted // For readable JSON
 
         do {
-            let data = try encoder.encode(self.transcriptionHistory)
-            try data.write(to: fileURL, options: [.atomicWrite])
+            let data = try encoder.encode(self.permanentHistory)
+            try data.write(to: fileURL, options: [.atomic])
             print("Successfully saved Apple transcription history to \(fileURL.path)")
         } catch {
             print("Error saving Apple transcription history to JSON: \(error.localizedDescription)")
@@ -60,11 +63,11 @@ class SpeechRecognizerService: ObservableObject {
         do {
             let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
-            self.transcriptionHistory = try decoder.decode([TranscriptionEntry].self, from: data)
-            print("Successfully loaded Apple transcription history from JSON. Count: \(self.transcriptionHistory.count)")
+            self.permanentHistory = try decoder.decode([TranscriptionEntry].self, from: data)
+            print("Successfully loaded Apple transcription history from JSON. Count: \(self.permanentHistory.count)")
         } catch {
             print("Error loading Apple transcription history from JSON: \(error.localizedDescription). Starting with empty history.")
-            self.transcriptionHistory = [] // Ensure clean state on error
+            self.permanentHistory = [] // Ensure clean state on error
         }
     }
     
@@ -170,12 +173,12 @@ class SpeechRecognizerService: ObservableObject {
                 }
                 
                 if result?.isFinal == true {
-                    // Сохраняем финальный результат
+                    // Add final result to session transcriptions
                     if let finalText = result?.bestTranscription.formattedString,
                        !finalText.isEmpty {
                         let entry = TranscriptionEntry(date: Date(), transcription: finalText)
-                        self.transcriptionHistory.append(entry)
-                        self.saveAppleHistoryToJSON()
+                        self.sessionTranscriptions.append(entry)
+                        print("Session transcription added (final): \(finalText)")
                     }
                     self.stopRecognition()
                 }
@@ -187,12 +190,23 @@ class SpeechRecognizerService: ObservableObject {
     }
     
     func stopRecognition() {
-        // Сохраняем текущий текст в историю, если он не пустой
-        if !recognizedText.isEmpty &&
-           (transcriptionHistory.isEmpty || transcriptionHistory.last?.transcription != recognizedText) {
-            let entry = TranscriptionEntry(date: Date(), transcription: recognizedText)
-            self.transcriptionHistory.append(entry)
-            self.saveAppleHistoryToJSON()
+        print("🛑 Apple Speech: stopRecognition called")
+        
+        // Add final recognized text to session transcriptions if it's not empty 
+        // and different from the last entry in the session.
+        let finalText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("📝 Final recognized text: '\(finalText)'")
+        
+        if !finalText.isEmpty {
+            if sessionTranscriptions.last?.transcription != finalText {
+                let entry = TranscriptionEntry(date: Date(), transcription: finalText)
+                sessionTranscriptions.append(entry)
+                print("✅ Session transcription added (stopRecognition): \(finalText)")
+            } else {
+                print("🚫 Final text already exists in session, not adding duplicate")
+            }
+        } else {
+            print("🚫 No final text to add to session")
         }
         
         audioEngine?.stop()
@@ -205,15 +219,122 @@ class SpeechRecognizerService: ObservableObject {
         recognitionTask = nil
         
         isRecognizing = false
+        
+        // Don't clear session here - it should remain visible in UI until explicitly saved to permanent storage
+        print("✅ Apple Speech recognition stopped. Session transcriptions count: \(sessionTranscriptions.count)")
     }
     
-    func clearRecognizedText(clearHistory: Bool = false) {
+    func clearRecognizedText(clearHistory: Bool = false, clearSession: Bool = false) {
         recognizedText = ""
         previousRecognizedText = ""
         if clearHistory {
-            transcriptionHistory = []
-            saveAppleHistoryToJSON() // Save the cleared history
+            permanentHistory = []
         }
+        if clearSession {
+            sessionTranscriptions = []
+        }
+    }
+    
+    // MARK: - Session Management
+    
+    func startNewSession() {
+        sessionTranscriptions.removeAll()
+        previousRecognizedText = ""
+        print("Started new Apple Speech session")
+    }
+    
+    func saveSessionToPermanentStorage() {
+        // Move session transcriptions to permanent history
+        permanentHistory.append(contentsOf: sessionTranscriptions)
+        
+        // Save to JSON file
+        saveAppleHistoryToJSON()
+        
+        print("Saved \(sessionTranscriptions.count) Apple Speech transcriptions to permanent storage")
+        
+        // Don't clear session here - keep them visible in UI until new session starts
+        print("Session transcriptions saved but kept visible in UI")
+    }
+    
+    // Clear session transcriptions (call after saving or when starting new session)
+    func clearSessionTranscriptions() {
+        sessionTranscriptions = []
+        print("Session transcriptions cleared")
+    }
+    
+    // Save all session transcriptions to permanent storage (call when stop capture is clicked)
+    func saveSessionTranscriptionsToPermanentStorage() {
+        print("💾 Apple Speech: saveSessionTranscriptionsToPermanentStorage called")
+        print("📝 Current session transcriptions count: \(sessionTranscriptions.count)")
+        
+        if !sessionTranscriptions.isEmpty {
+            print("📝 Session transcriptions to save:")
+            for (index, entry) in sessionTranscriptions.enumerated() {
+                print("  \(index + 1). [\(entry.date)] \(entry.transcription.prefix(50))...")
+            }
+        }
+        
+        // Add all session transcriptions to the permanent history
+        let initialPermanentCount = permanentHistory.count
+        permanentHistory.append(contentsOf: sessionTranscriptions)
+        let finalPermanentCount = permanentHistory.count
+        
+        print("✅ Saved \(sessionTranscriptions.count) session transcriptions to permanent storage")
+        print("📊 Permanent history: \(initialPermanentCount) → \(finalPermanentCount) entries")
+        
+        // Save to JSON file
+        saveAppleHistoryToJSON()
+        
+        // Don't clear session transcriptions here - keep them visible in UI
+        // They will be cleared when starting a new recording session
+        print("👁️ Session transcriptions saved but kept visible in UI")
+    }
+    
+    // Get current session transcriptions
+    func getSessionTranscriptions() -> [TranscriptionEntry] {
+        return sessionTranscriptions
+    }
+    
+    // Get session transcriptions as formatted text
+    func getSessionTranscriptionsText() -> String {
+        return sessionTranscriptions.map { $0.transcription }.joined(separator: "\n")
+    }
+    
+    // Функция для расчета схожести двух текстов
+    private func calculateTextSimilarity(_ text1: String, _ text2: String) -> Double {
+        // Если один из текстов пустой, возвращаем 0
+        if text1.isEmpty || text2.isEmpty {
+            return 0.0
+        }
+        
+        // Если тексты идентичны, возвращаем 1
+        if text1 == text2 {
+            return 1.0
+        }
+        
+        // Простой алгоритм - проверяем содержание одного текста в другом
+        if text1.count > text2.count {
+            if text1.contains(text2) {
+                return Double(text2.count) / Double(text1.count)
+            }
+        } else {
+            if text2.contains(text1) {
+                return Double(text1.count) / Double(text2.count)
+            }
+        }
+        
+        // Более продвинутая проверка - считаем общие слова
+        let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        
+        if words1.isEmpty || words2.isEmpty {
+            return 0.1 // Return a small non-zero if one has words and the other doesn't after split, but were non-empty initially
+        }
+        
+        let commonWords = words1.intersection(words2)
+        let similarity = Double(commonWords.count) / Double(max(words1.count, words2.count))
+        
+        return similarity
     }
     
     // Get a list of all supported locales with their display names
@@ -226,30 +347,64 @@ class SpeechRecognizerService: ObservableObject {
     
     // Check if the new transcription is significantly different from the previous one
     private func checkAndSaveSignificantChange(newText: String) {
-        // Если текст существенно короче предыдущего, это может означать сброс Apple Speech
-        if previousRecognizedText.count > 0 && 
-           previousRecognizedText.count - newText.count > significantChangeThreshold {
-            // Сохраняем предыдущую транскрипцию в историю
-            if !previousRecognizedText.isEmpty {
-                let entry = TranscriptionEntry(date: Date(), transcription: previousRecognizedText)
-                self.transcriptionHistory.append(entry)
-                self.saveAppleHistoryToJSON()
-            }
-        } 
-        // Или если текст стал значительно длиннее, сохраняем промежуточный результат
-        else if newText.count - previousRecognizedText.count > 30 {
-            if !previousRecognizedText.isEmpty {
-                let entry = TranscriptionEntry(date: Date(), transcription: previousRecognizedText)
-                self.transcriptionHistory.append(entry)
-                self.saveAppleHistoryToJSON()
+        let trimmedOldText = previousRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNewText = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let shortTextMaxLength = 10 // Max length for a text to be considered "short"
+        let similarityThresholdForShortText = 0.1 // Stricter threshold for short texts
+        let similarityThresholdForLongText = 0.5 // Regular threshold for longer texts
+
+        if !trimmedOldText.isEmpty && !trimmedNewText.isEmpty {
+            // Check for divergence: neither text is a prefix of the other.
+            if !trimmedNewText.hasPrefix(trimmedOldText) && !trimmedOldText.hasPrefix(trimmedNewText) {
+                let similarity = calculateTextSimilarity(trimmedOldText, trimmedNewText)
+                // Log the similarity and which threshold will be used
+                var effectiveThreshold = similarityThresholdForLongText
+                var textCategory = "long"
+                if trimmedOldText.count < shortTextMaxLength {
+                    effectiveThreshold = similarityThresholdForShortText
+                    textCategory = "short"
+                }
+                print("Similarity: \(String(format: "%.2f", similarity)) for old ('\(textCategory)' text): '\(trimmedOldText)' | new: '\(trimmedNewText)'. Effective threshold: \(effectiveThreshold)")
+
+                var shouldSaveOldText = false
+                if trimmedOldText.count < shortTextMaxLength {
+                    if similarity < similarityThresholdForShortText {
+                        shouldSaveOldText = true
+                    }
+                } else {
+                    if similarity < similarityThresholdForLongText {
+                        shouldSaveOldText = true
+                    }
+                }
+
+                if shouldSaveOldText {
+                    if sessionTranscriptions.last?.transcription != trimmedOldText {
+                        let entry = TranscriptionEntry(date: Date(), transcription: trimmedOldText)
+                        sessionTranscriptions.append(entry)
+                        print("Session transcription added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
+                    }
+                }
             }
         }
-        
-        previousRecognizedText = newText
+        previousRecognizedText = newText // Always update to the latest text from the recognizer
     }
     
-    // Получение полной истории транскрипций
+    // Получение полной истории транскрипций (включая текущую сессию)
     func getFullTranscriptionHistory() -> String {
-        return transcriptionHistory.map { "\($0.transcription)\n\n--- Entry Date: \($0.date) ---" }.joined(separator: "\n")
+        let allTranscriptions = permanentHistory + sessionTranscriptions
+        return allTranscriptions.map { $0.transcription }.joined(separator: "\n")
+    }
+    
+    // Получение истории только из постоянного хранилища
+    func getPermanentTranscriptionHistory() -> String {
+        return permanentHistory.map { $0.transcription }.joined(separator: "\n")
+    }
+    
+    // Start a new recording session (clears previous session transcriptions)
+    func startNewRecordingSession() {
+        clearSessionTranscriptions()
+        clearRecognizedText()
+        print("Started new recording session")
     }
 }
