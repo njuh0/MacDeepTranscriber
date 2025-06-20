@@ -249,12 +249,14 @@ class WhisperKitService: ObservableObject {
     func stopRecognition() {
         print("🛑 WhisperKit: stopRecognition called")
         
-        // Set stopping flag to prevent any more periodic transcriptions
+        // Set stopping flag FIRST to prevent any more periodic transcriptions
         isStopping = true
-        
         isRecording = false
+        
+        // Cancel timer immediately
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
+        print("⏹️ WhisperKit: Timer cancelled and flags set")
         
         // Save the last accumulated text if it exists and hasn't been saved yet
         let trimmedAccumulatedText = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -286,13 +288,16 @@ class WhisperKitService: ObservableObject {
         audioBuffers.removeAll()
         bufferLock.unlock()
         
-        // Clear accumulated text when stopping
+        // Clear accumulated text when stopping and notify UI
         accumulatedText = ""
+        DispatchQueue.main.async {
+            self.onRecognitionResult?("")
+        }
         lastProcessedBufferCount = 0
         lastTranscriptionLength = 0
         lastContextTranscription = ""
         lastBufferResetTime = Date()
-        
+                
         // Reset stopping flag
         isStopping = false
                 
@@ -352,7 +357,10 @@ class WhisperKitService: ObservableObject {
     }
     
     private func performTranscription() {
-        guard isRecording && !audioBuffers.isEmpty else { return }
+        guard isRecording && !audioBuffers.isEmpty && !isStopping else { 
+            print("🚫 Skipping transcription: isRecording=\(isRecording), buffers=\(audioBuffers.count), isStopping=\(isStopping)")
+            return 
+        }
         
         bufferLock.lock()
         let allBuffers = Array(audioBuffers)
@@ -396,6 +404,12 @@ class WhisperKitService: ObservableObject {
     }
     
     private func transcribeWithContext(_ buffers: [AVAudioPCMBuffer]) async {
+        // Check if we should continue transcribing
+        guard isRecording && !isStopping else {
+            print("🚫 Transcription cancelled: isRecording=\(isRecording), isStopping=\(isStopping)")
+            return
+        }
+        
         guard let audioFormat = audioFormat else { return }
         
         self.isProcessing = true
@@ -421,7 +435,14 @@ class WhisperKitService: ObservableObject {
             
             // Update UI on main thread - use smart transcription replacement
             self.isProcessing = false
+            
             if !transcription.isEmpty {
+                // Check again if we should continue (transcription might have taken time)
+                guard isRecording && !isStopping else {
+                    print("🚫 Skipping UI update: transcription completed but recording stopped")
+                    return
+                }
+                
                 // Use the current transcription as the new accumulated text
                 // WhisperKit's context windows provide the best available transcription
                 accumulatedText = transcription
@@ -441,8 +462,6 @@ class WhisperKitService: ObservableObject {
                         let newEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
                         sessionTranscriptions.append(newEntry)
                         print("➕ Added first transcription to session: \(trimmedTranscription.count) chars")
-                        // Save to JSON immediately
-                        saveWhisperHistoryToJSONRealTime()
                     } else {
                         // Есть существующие записи, проверяем последнюю
                         let lastIndex = sessionTranscriptions.count - 1
@@ -458,16 +477,12 @@ class WhisperKitService: ObservableObject {
                                 let updatedEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
                                 sessionTranscriptions[lastIndex] = updatedEntry
                                 print("🔄 Updated last session transcription: \(trimmedTranscription.count) chars")
-                                // Save to JSON immediately
-                                saveWhisperHistoryToJSONRealTime()
                             } else {
                                 // Низкая схожесть - добавляем новую запись, но только если она достаточно отличается
                                 if shouldSaveTranscription(trimmedTranscription) {
                                     let newEntry = TranscriptionEntry(date: Date(), transcription: trimmedTranscription)
                                     sessionTranscriptions.append(newEntry)
                                     print("➕ Added new transcription to session: \(trimmedTranscription.count) chars")
-                                    // Save to JSON immediately
-                                    saveWhisperHistoryToJSONRealTime()
                                 } else {
                                     print("🚫 Skipped adding transcription (too similar to existing entries)")
                                 }
@@ -478,55 +493,17 @@ class WhisperKitService: ObservableObject {
                     }
                 }
                 print("🎵 Current transcription (accumulatedText): \(accumulatedText.count) chars")
-                self.onRecognitionResult?(accumulatedText)
-            }
-            
-        } catch {
-            self.isProcessing = false
-            self.onError?(error)
-        }
-    }
-    
-    
-    private func transcribeBuffers(_ buffers: [AVAudioPCMBuffer]) async {
-        guard let audioFormat = audioFormat else { return }
-        
-        self.isProcessing = true
-        
-        do {
-            // Combine all buffers into a single audio array
-            let audioData = try combineBuffersToFloatArray(buffers, format: audioFormat)
-            
-            // Add audio diagnostics
-            let duration = Double(audioData.count) / audioFormat.sampleRate
-            let rms = sqrt(audioData.map { $0 * $0 }.reduce(0, +) / Float(audioData.count))
-            print("🔍 Audio diagnostics: \(String(format: "%.2f", duration))s duration, RMS: \(String(format: "%.4f", rms))")
-            
-            // Skip transcription if audio is too quiet or too short
-            guard duration >= 0.5 && rms > 0.001 else {
-                print("⚠️ Skipping transcription: audio too short or quiet")
-                self.isProcessing = false
-                return
-            }
-            
-            // Transcribe using WhisperKit
-            let transcription = try await transcribeAudioData(audioData)
-            
-            // Update UI on main thread
-            self.isProcessing = false
-            if !transcription.isEmpty {
-                // Добавляем новый текст к существующему (накопительная транскрипция)
-                if !accumulatedText.isEmpty {
-                    accumulatedText += " " + transcription
-                } else {
-                    accumulatedText = transcription
-                }
                 
-                // Send the accumulated transcription
-                self.onRecognitionResult?(accumulatedText)
-                print("WhisperKit added text: \(transcription)")
-                print("WhisperKit total text: \(accumulatedText)")
+                // Final check before updating UI
+                if isRecording && !isStopping {
+                    self.onRecognitionResult?(accumulatedText)
+                } else {
+                    print("🚫 Skipping UI callback: recording stopped during transcription")
+                }
             }
+            
+            // Save to JSON after processing - always save to keep session file up to date
+            saveWhisperHistoryToJSONRealTime()
             
         } catch {
             self.isProcessing = false
@@ -833,6 +810,9 @@ extension WhisperKitService {
     }
     
     func clearSession() {
+        DispatchQueue.main.async {
+            self.onRecognitionResult?("")
+        }
         sessionTranscriptions.removeAll()
         accumulatedText = ""
         lastProcessedBufferCount = 0

@@ -245,11 +245,12 @@ class SpeechRecognizerService: ObservableObject {
                         let entry = TranscriptionEntry(date: Date(), transcription: finalText)
                         self.sessionTranscriptions.append(entry)
                         print("Session transcription added (final): \(finalText)")
-                        // Save to JSON immediately
-                        self.saveAppleHistoryToJSONRealTime()
                     }
                     self.stopRecognition()
                 }
+                
+                // Save to JSON after all transcription processing is complete
+                self.saveAppleHistoryToJSONRealTime()
             }
         }
         
@@ -291,6 +292,8 @@ class SpeechRecognizerService: ObservableObject {
         isRecognizing = false
         errorMessage = nil // Clear any error message when stopping normally
         
+        recognizedText.removeAll()
+
         // Don't clear session here - it should remain visible in UI until explicitly saved to permanent storage
         print("✅ Apple Speech recognition stopped. Session transcriptions count: \(sessionTranscriptions.count)")
     }
@@ -466,7 +469,6 @@ class SpeechRecognizerService: ObservableObject {
                         print("➕ Session transcription added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
                         print("📊 Session transcriptions count now: \(sessionTranscriptions.count)")
                         // Save to JSON immediately
-                        saveAppleHistoryToJSONRealTime()
                     } else {
                         print("🚫 Old text already matches last session entry, not adding duplicate")
                     }
@@ -489,6 +491,47 @@ class SpeechRecognizerService: ObservableObject {
     func startNewRecordingSession() {
         clearSessionTranscriptions()
         clearRecognizedText()
+        // Create empty session JSON file immediately 
+        initializeSessionJSONFile()
         print("Started new recording session")
+    }
+    
+    /// Creates/initializes an empty session JSON file immediately when starting a new recording session
+    private func initializeSessionJSONFile() {
+        let documentsDir = getDocumentsDirectory()
+        let fileURL = documentsDir.appendingPathComponent("apple_history_session.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+
+        print("🔧 Apple Speech: Initializing empty session JSON file")
+        print("  📁 Documents directory: \(documentsDir.path)")
+        print("  📄 File URL: \(fileURL.path)")
+
+        // Create directory if it doesn't exist
+        do {
+            try FileManager.default.createDirectory(at: documentsDir, withIntermediateDirectories: true, attributes: nil)
+            print("  ✅ Documents directory confirmed/created")
+        } catch {
+            print("  ❌ Failed to create documents directory: \(error.localizedDescription)")
+            return
+        }
+
+        // Create empty array JSON file
+        do {
+            let emptyArray: [TranscriptionEntry] = []
+            let data = try encoder.encode(emptyArray)
+            try data.write(to: fileURL, options: [.atomicWrite])
+            
+            // Verify file was actually written
+            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+            let fileSize = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int
+            
+            print("  ✅ Initialized empty Apple Speech session JSON file")
+            print("  📄 File exists: \(fileExists), Size: \(fileSize ?? 0) bytes")
+            print("  📍 Full path: \(fileURL.path)")
+        } catch {
+            print("  ❌ Error creating empty Apple Speech session JSON file: \(error.localizedDescription)")
+            print("  ❌ File path: \(fileURL.path)")
+        }
     }
 }
