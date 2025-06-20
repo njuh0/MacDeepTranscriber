@@ -19,7 +19,7 @@ class AudioCaptureService: ObservableObject {
     @Published var transcriptionList: [TranscriptionEntry] = []
     
     // Speech engine selection
-    @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.whisperKit]
+    @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.appleSpeech]
     @Published var appleSpeechText: String = ""
     @Published var appleSpeechHistory: [String] = []
     
@@ -38,6 +38,8 @@ class AudioCaptureService: ObservableObject {
     // WhisperKit Configuration
     @Published var whisperTranscriptionInterval: TimeInterval = 15.0
     @Published var whisperMaxBufferDuration: TimeInterval = 120.0
+    @Published var whisperSelectedLanguage: String = "en" // ISO 639-1 код для WhisperKit
+    @Published var whisperTaskType: WhisperTaskType = .transcribe // transcribe или translate
     
     // Apple Speech Configuration
     @Published var selectedLocale: Locale = Locale(identifier: "en-US")
@@ -144,6 +146,8 @@ class AudioCaptureService: ObservableObject {
             // Sync initial configuration values
             updateWhisperTranscriptionInterval(whisperTranscriptionInterval)
             updateWhisperMaxBufferDuration(whisperMaxBufferDuration)
+            updateWhisperLanguage(whisperSelectedLanguage)
+            updateWhisperTaskType(whisperTaskType)
             
             // Initialize display lists
             updateWhisperKitDisplayList()
@@ -514,6 +518,147 @@ class AudioCaptureService: ObservableObject {
         }
         selectedLocale = locale
         speechRecognizerService.changeLocale(to: locale)
+        
+        // Синхронизация языка с WhisperKit
+        syncLanguageToWhisperKit(from: locale)
+    }
+    
+    // Синхронизация языка между Apple Speech и WhisperKit
+    private func syncLanguageToWhisperKit(from locale: Locale) {
+        let whisperLanguage = appleLocaleToWhisperLanguage(locale)
+        if whisperSelectedLanguage != whisperLanguage {
+            whisperSelectedLanguage = whisperLanguage
+            whisperKitService.updateLanguage(whisperLanguage)
+        }
+    }
+    
+    private func syncLanguageToAppleSpeech(from whisperLanguage: String) {
+        let appleLocale = whisperLanguageToAppleLocale(whisperLanguage)
+        if selectedLocale.identifier != appleLocale.identifier {
+            selectedLocale = appleLocale
+            speechRecognizerService.changeLocale(to: appleLocale)
+        }
+    }
+    
+    // Метод для обновления языка WhisperKit
+    func updateWhisperLanguage(_ language: String) {
+        whisperSelectedLanguage = language
+        whisperKitService.updateLanguage(language)
+        
+        // Синхронизируем с Apple Speech
+        syncLanguageToAppleSpeech(from: language)
+    }
+    
+    // Метод для обновления типа задачи WhisperKit
+    func updateWhisperTaskType(_ taskType: WhisperTaskType) {
+        whisperTaskType = taskType
+        whisperKitService.updateTaskType(taskType)
+    }
+    
+    // Поддерживаемые языки для WhisperKit (ISO 639-1)
+    func getSupportedWhisperLanguages() -> [(String, String)] {
+        return [
+            ("en", "English"),
+            ("ru", "Русский"),
+            ("es", "Español"),
+            ("fr", "Français"),
+            ("de", "Deutsch"),
+            ("it", "Italiano"),
+            ("pt", "Português"),
+            ("zh", "中文"),
+            ("ja", "日本語"),
+            ("ko", "한국어"),
+            ("ar", "العربية"),
+            ("hi", "हिन्दी"),
+            ("tr", "Türkçe"),
+            ("pl", "Polski"),
+            ("nl", "Nederlands"),
+            ("sv", "Svenska"),
+            ("da", "Dansk"),
+            ("no", "Norsk"),
+            ("fi", "Suomi"),
+            ("uk", "Українська"),
+            ("cs", "Čeština"),
+            ("sk", "Slovenčina"),
+            ("hu", "Magyar"),
+            ("ro", "Română"),
+            ("bg", "Български"),
+            ("hr", "Hrvatski"),
+            ("sr", "Српски"),
+            ("sl", "Slovenščina"),
+            ("et", "Eesti"),
+            ("lv", "Latviešu"),
+            ("lt", "Lietuvių"),
+            ("mt", "Malti"),
+            ("ga", "Gaeilge"),
+            ("cy", "Cymraeg"),
+            ("is", "Íslenska"),
+            ("mk", "Македонски"),
+            ("sq", "Shqip"),
+            ("eu", "Euskera"),
+            ("ca", "Català"),
+            ("gl", "Galego")
+        ]
+    }
+    
+    // Конвертация локали Apple Speech в язык WhisperKit
+    private func appleLocaleToWhisperLanguage(_ locale: Locale) -> String {
+        let languageCode = locale.language.languageCode?.identifier ?? "en"
+        // Маппинг основных языков
+        switch languageCode {
+        case "zh": 
+            // Для китайского определяем упрощенный или традиционный
+            if locale.identifier.contains("CN") || locale.identifier.contains("Hans") {
+                return "zh"
+            } else {
+                return "zh" // WhisperKit использует "zh" для китайского
+            }
+        default:
+            return languageCode
+        }
+    }
+    
+    // Конвертация языка WhisperKit в локаль Apple Speech
+    private func whisperLanguageToAppleLocale(_ language: String) -> Locale {
+        // Маппинг основных языков обратно в локали Apple
+        switch language {
+        case "en": return Locale(identifier: "en-US")
+        case "ru": return Locale(identifier: "ru-RU")
+        case "es": return Locale(identifier: "es-ES")
+        case "fr": return Locale(identifier: "fr-FR")
+        case "de": return Locale(identifier: "de-DE")
+        case "it": return Locale(identifier: "it-IT")
+        case "pt": return Locale(identifier: "pt-BR")
+        case "zh": return Locale(identifier: "zh-CN")
+        case "ja": return Locale(identifier: "ja-JP")
+        case "ko": return Locale(identifier: "ko-KR")
+        case "ar": return Locale(identifier: "ar-SA")
+        case "hi": return Locale(identifier: "hi-IN")
+        case "tr": return Locale(identifier: "tr-TR")
+        case "pl": return Locale(identifier: "pl-PL")
+        case "nl": return Locale(identifier: "nl-NL")
+        case "sv": return Locale(identifier: "sv-SE")
+        case "da": return Locale(identifier: "da-DK")
+        case "no": return Locale(identifier: "no-NO")
+        case "fi": return Locale(identifier: "fi-FI")
+        case "uk": return Locale(identifier: "uk-UA")
+        case "cs": return Locale(identifier: "cs-CZ")
+        case "sk": return Locale(identifier: "sk-SK")
+        case "hu": return Locale(identifier: "hu-HU")
+        case "ro": return Locale(identifier: "ro-RO")
+        case "bg": return Locale(identifier: "bg-BG")
+        case "hr": return Locale(identifier: "hr-HR")
+        case "sr": return Locale(identifier: "sr-RS")
+        case "sl": return Locale(identifier: "sl-SI")
+        case "et": return Locale(identifier: "et-EE")
+        case "lv": return Locale(identifier: "lv-LV")
+        case "lt": return Locale(identifier: "lt-LT")
+        case "mt": return Locale(identifier: "mt-MT")
+        case "ga": return Locale(identifier: "ga-IE")
+        case "cy": return Locale(identifier: "cy-GB")
+        case "is": return Locale(identifier: "is-IS")
+        default: return Locale(identifier: "en-US")
+        }
     }
     
     // MARK: - Session Management

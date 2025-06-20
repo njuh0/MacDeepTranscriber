@@ -71,6 +71,8 @@ class WhisperKitService: ObservableObject {
     private var modelName: String
     @Published var transcriptionInterval: TimeInterval
     @Published var maxBufferDuration: TimeInterval
+    private var selectedLanguage: String = "en" // ISO 639-1 код
+    private var taskType: WhisperTaskType = .transcribe
     
     init(modelName: String = "base",
          transcriptionInterval: TimeInterval = 15.0,  // Увеличили до 15 секунд для лучшего качества
@@ -590,7 +592,8 @@ class WhisperKitService: ObservableObject {
             print("🎵 Processing audio: \(processedAudio.count) samples at \(targetSampleRate)Hz")
             
             // Transcribe using WhisperKit with audioArray method
-            let results = try await whisperKit.transcribe(audioArray: processedAudio, decodeOptions: DecodingOptions(task: .transcribe, language: "en"))
+            let task: DecodingTask = taskType == .transcribe ? .transcribe : .translate
+            let results = try await whisperKit.transcribe(audioArray: processedAudio, decodeOptions: DecodingOptions(task: task, language: selectedLanguage))
             
             // Extract text from first result (WhisperKit returns [TranscriptionResult])
             let transcription = results.first?.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) ?? ""
@@ -835,5 +838,17 @@ extension WhisperKitService {
         lastTranscriptionLength = 0
         lastContextTranscription = ""
         isStopping = false
+    }
+    
+    // MARK: - Language and Task Configuration
+    
+    func updateLanguage(_ language: String) {
+        selectedLanguage = language
+        print("🗣️ WhisperKit language updated to: \(language)")
+    }
+    
+    func updateTaskType(_ taskType: WhisperTaskType) {
+        self.taskType = taskType
+        print("📝 WhisperKit task type updated to: \(taskType.rawValue)")
     }
 }

@@ -42,7 +42,7 @@ struct WhisperKitSettingsView: View {
 
                 // WhisperKit Configuration
                 VStack(spacing: 12) {
-                    Text("WhisperKit Settings")
+                    Text("Processing Settings")
                         .font(.headline)
                         .foregroundColor(.primary)
 

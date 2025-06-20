@@ -1,5 +1,21 @@
 import Foundation
 
+// MARK: - WhisperKit Configuration Models
+
+enum WhisperTaskType: String, CaseIterable {
+    case transcribe = "transcribe"
+    case translate = "translate"
+    
+    var displayName: String {
+        switch self {
+        case .transcribe:
+            return "Transcribe"
+        case .translate:
+            return "Translate to English"
+        }
+    }
+}
+
 // MARK: - Transcription Entry Model
 struct TranscriptionEntry: Codable, Identifiable {
     let id: UUID

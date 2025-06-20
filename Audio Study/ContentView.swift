@@ -13,6 +13,11 @@ struct ContentView: View {
 
                 SpeechEngineSelectionView(audioCaptureService: audioCaptureService)
 
+                // Unified Language Selection (shown when any engine is selected)
+                if !audioCaptureService.selectedSpeechEngines.isEmpty {
+                    LanguageSelectionView(audioCaptureService: audioCaptureService)
+                }
+
                 // Conditional rendering for settings views
                 if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
                     WhisperKitSettingsView(audioCaptureService: audioCaptureService)
