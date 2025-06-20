@@ -47,6 +47,8 @@ struct DetailView: View {
                     LearnWordsView()
                 case .aiChat:
                     AIChatView()
+                case .settings:
+                    SettingsView()
                 }
             } else {
                 WelcomeView()

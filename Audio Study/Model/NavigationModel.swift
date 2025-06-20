@@ -11,6 +11,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case record = "Record"
     case learnWords = "Learn words"
     case aiChat = "AI Chat"
+    case settings = "Settings"
     
     var id: String { self.rawValue }
     
@@ -22,6 +23,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return "book.circle"
         case .aiChat:
             return "bubble.left.and.bubble.right.circle"
+        case .settings:
+            return "gearshape.circle"
         }
     }
 }
