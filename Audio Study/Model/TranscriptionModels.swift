@@ -46,3 +46,18 @@ enum DateUtil {
         return iso8601Formatter.string(from: Date())
     }
 }
+
+// MARK: - Recording Metadata Model
+struct RecordingMetadata: Codable {
+    let title: String
+    let date: Date
+    let appleSpeechEnabled: Bool
+    let whisperKitEnabled: Bool
+    let whisperModel: String
+    let language: String
+    let appleSpeechLocale: String
+    let copiedFiles: [String]
+    let appleSpeechTranscriptions: [TranscriptionEntry]
+    let whisperKitTranscriptions: [TranscriptionEntry]
+    let totalTranscriptions: Int
+}

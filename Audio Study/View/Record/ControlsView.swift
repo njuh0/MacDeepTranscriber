@@ -2,6 +2,10 @@ import SwiftUI
 
 struct ControlsView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
+    
+    // State for save recording sheet
+    @State private var showSaveRecordingSheet = false
+    @State private var isStoppingCapture = false
 
     var body: some View {
         VStack {
@@ -35,6 +39,12 @@ struct ControlsView: View {
                     }
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
+                    
+                    Button("Open Recordings") {
+                        audioCaptureService.openRecordingsFolder()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(.blue)
                 }
                 .padding()
                 .padding(.bottom, 8)
@@ -66,12 +76,14 @@ struct ControlsView: View {
 
                 Button(action: {
                     if audioCaptureService.isCapturing {
-                        audioCaptureService.stopCapture()
+                        // First stop the capture, then show save sheet
+                        stopCaptureAndShowSaveSheet()
                     } else {
                         audioCaptureService.startCapture()
                     }
                 }) {
                     Text(
+                        isStoppingCapture ? "Stopping..." :
                         audioCaptureService.isCapturing
                             ? "Stop Capture" : "Start Capture"
                     )
@@ -79,12 +91,30 @@ struct ControlsView: View {
                     .cornerRadius(10) // This might be better on a ButtonStyle
                 }
                 .disabled(
+                    isStoppingCapture ||
                     audioCaptureService.selectedSpeechEngines.isEmpty ||
                     !audioCaptureService.isMicrophoneAccessGranted ||
                     (audioCaptureService.selectedSpeechEngines.contains(.whisperKit) && !audioCaptureService.isModelLoaded)
                 )
             }
             .padding()
+        }
+        .sheet(isPresented: $showSaveRecordingSheet) {
+            SaveRecordingSheet(isPresented: $showSaveRecordingSheet) { title in
+                // Capture is already stopped, just save the recording
+                audioCaptureService.saveRecordingToTitledFolder(title: title)
+            }
+        }
+    }
+    
+    /// Stops capture first, then shows save sheet
+    private func stopCaptureAndShowSaveSheet() {
+        isStoppingCapture = true
+        
+        // Stop the capture and engines first, then show save sheet
+        audioCaptureService.stopCaptureWithCompletion {
+            isStoppingCapture = false
+            showSaveRecordingSheet = true
         }
     }
 }

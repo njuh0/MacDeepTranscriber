@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import Combine
 import Speech
+import AppKit
 
 @MainActor
 class AudioCaptureService: ObservableObject {
@@ -397,6 +398,56 @@ class AudioCaptureService: ObservableObject {
         }
     }
     
+    /// Stops capture and calls completion when engines are fully stopped
+    func stopCaptureWithCompletion(_ completion: @escaping () -> Void) {
+        guard isCapturing else { 
+            completion()
+            return 
+        }
+
+        print("🛑 AudioCaptureService: Starting stopCaptureWithCompletion process...")
+        
+        // Stop active engines first to ensure final transcriptions are captured
+        if selectedSpeechEngines.contains(.whisperKit) {
+            print("🛑 Stopping WhisperKit recognition...")
+            whisperKitService.stopRecognition()
+            print("✅ WhisperKit stopped. Session count: \(whisperKitService.sessionTranscriptions.count)")
+        }
+        
+        if selectedSpeechEngines.contains(.appleSpeech) {
+            print("🛑 Stopping Apple Speech recognition...")
+            speechRecognizerService.stopRecognition()
+            print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
+        }
+
+        // Ensure all async operations complete before calling completion
+        Task {
+            // Wait a brief moment for any final transcriptions to be processed
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            
+            await MainActor.run {
+                // Now save session transcriptions to permanent storage after stopping
+                print("💾 Saving session transcriptions to permanent storage...")
+                self.saveSessionToPermanentStorage()
+                
+                // Stop audio engine in any case
+                if let engine = self.audioEngine {
+                    engine.stop()
+                    if engine.inputNode.numberOfInputs > 0 {
+                        engine.inputNode.removeTap(onBus: 0)
+                    }
+                }
+                self.audioEngine = nil
+
+                self.isCapturing = false
+                print("✅ Capture stopped and session saved. Calling completion.")
+                
+                // Call completion after everything is done
+                completion()
+            }
+        }
+    }
+    
     // Helper methods for Apple Speech
     private func startAppleSpeech() {
         Task {
@@ -726,6 +777,143 @@ class AudioCaptureService: ObservableObject {
         // (permanent history is handled separately and saved when stopping)
         let sessionList = speechRecognizerService.sessionTranscriptions
         appleSpeechHistory = sessionList.map { $0.transcription }
+    }
+    
+    // MARK: - Save Recording to Titled Folder
+    
+    /// Saves the current recording session by copying relevant JSON files to a titled folder
+    func saveRecordingToTitledFolder(title: String) {
+        let documentsDirectory = getDocumentsDirectory()
+        let recordingFolderURL = documentsDirectory.appendingPathComponent("Recordings").appendingPathComponent(title)
+        
+        // Create the recordings folder structure
+        do {
+            try FileManager.default.createDirectory(at: recordingFolderURL, withIntermediateDirectories: true, attributes: nil)
+            print("✅ Created recording folder: \(recordingFolderURL.path)")
+        } catch {
+            print("❌ Error creating recording folder: \(error.localizedDescription)")
+            return
+        }
+        
+        // Copy JSON files for active engines only
+        var copiedFiles: [String] = []
+        
+        // Read Apple Speech session transcriptions if it was selected
+        var appleSpeechTranscriptions: [TranscriptionEntry] = []
+        if selectedSpeechEngines.contains(.appleSpeech) {
+            let appleSpeechSourceURL = documentsDirectory.appendingPathComponent("apple_history_session.json")
+            
+            if FileManager.default.fileExists(atPath: appleSpeechSourceURL.path) {
+                do {
+                    let data = try Data(contentsOf: appleSpeechSourceURL)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    appleSpeechTranscriptions = try decoder.decode([TranscriptionEntry].self, from: data)
+                    copiedFiles.append("Apple Speech transcriptions")
+                    print("✅ Loaded Apple Speech session transcriptions: \(appleSpeechTranscriptions.count) entries")
+                } catch {
+                    print("❌ Error reading Apple Speech session JSON: \(error.localizedDescription)")
+                }
+            } else {
+                print("⚠️ Apple Speech session JSON file not found at: \(appleSpeechSourceURL.path)")
+            }
+        }
+        
+        // Read WhisperKit session transcriptions if it was selected
+        var whisperKitTranscriptions: [TranscriptionEntry] = []
+        if selectedSpeechEngines.contains(.whisperKit) {
+            let whisperKitSourceURL = documentsDirectory.appendingPathComponent("whisper_history_session.json")
+            
+            if FileManager.default.fileExists(atPath: whisperKitSourceURL.path) {
+                do {
+                    let data = try Data(contentsOf: whisperKitSourceURL)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    whisperKitTranscriptions = try decoder.decode([TranscriptionEntry].self, from: data)
+                    copiedFiles.append("WhisperKit transcriptions")
+                    print("✅ Loaded WhisperKit session transcriptions: \(whisperKitTranscriptions.count) entries")
+                } catch {
+                    print("❌ Error reading WhisperKit session JSON: \(error.localizedDescription)")
+                }
+            } else {
+                print("⚠️ WhisperKit session JSON file not found at: \(whisperKitSourceURL.path)")
+            }
+        }
+        
+        // Create comprehensive recording data with all transcriptions and metadata
+        let totalTranscriptions = appleSpeechTranscriptions.count + whisperKitTranscriptions.count
+        let recordingData = RecordingMetadata(
+            title: title,
+            date: Date(),
+            appleSpeechEnabled: selectedSpeechEngines.contains(.appleSpeech),
+            whisperKitEnabled: selectedSpeechEngines.contains(.whisperKit),
+            whisperModel: selectedWhisperModel,
+            language: whisperSelectedLanguage,
+            appleSpeechLocale: selectedLocale.identifier,
+            copiedFiles: copiedFiles,
+            appleSpeechTranscriptions: appleSpeechTranscriptions,
+            whisperKitTranscriptions: whisperKitTranscriptions,
+            totalTranscriptions: totalTranscriptions
+        )
+        
+        let recordingDataURL = recordingFolderURL.appendingPathComponent("recording.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let data = try encoder.encode(recordingData)
+            try data.write(to: recordingDataURL)
+            print("✅ Saved comprehensive recording data to: \(recordingDataURL.path)")
+            print("📊 Total transcriptions saved: \(totalTranscriptions)")
+            print("📝 Apple Speech entries: \(appleSpeechTranscriptions.count)")
+            print("📝 WhisperKit entries: \(whisperKitTranscriptions.count)")
+        } catch {
+            print("❌ Error saving comprehensive recording data: \(error.localizedDescription)")
+        }
+        
+        // Update status message
+        let totalCount = appleSpeechTranscriptions.count + whisperKitTranscriptions.count
+        statusMessage = "Recording '\(title)' saved with \(totalCount) transcription(s)"
+        print("✅ Recording saved successfully: \(title) with \(totalCount) total transcriptions")
+    }
+    
+    private func getDocumentsDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
+    // MARK: - Recordings Management
+    
+    /// Gets list of saved recordings
+    func getSavedRecordings() -> [String] {
+        let documentsDirectory = getDocumentsDirectory()
+        let recordingsDirectory = documentsDirectory.appendingPathComponent("Recordings")
+        
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: recordingsDirectory, includingPropertiesForKeys: nil)
+            return contents.compactMap { url in
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue {
+                    return url.lastPathComponent
+                }
+                return nil
+            }.sorted()
+        } catch {
+            print("Error reading recordings directory: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    /// Opens the recordings folder in Finder
+    func openRecordingsFolder() {
+        let documentsDirectory = getDocumentsDirectory()
+        let recordingsDirectory = documentsDirectory.appendingPathComponent("Recordings")
+        
+        // Create the directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true, attributes: nil)
+        
+        // Open in Finder
+        NSWorkspace.shared.open(recordingsDirectory)
     }
 
 }
