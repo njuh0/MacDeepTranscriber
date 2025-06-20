@@ -39,12 +39,6 @@ struct ControlsView: View {
                     }
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
-                    
-                    Button("Open Recordings") {
-                        audioCaptureService.openRecordingsFolder()
-                    }
-                    .buttonStyle(.bordered)
-                    .foregroundColor(.blue)
                 }
                 .padding()
                 .padding(.bottom, 8)

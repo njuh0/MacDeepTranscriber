@@ -62,6 +62,17 @@ struct RecordView: View {
             .padding(.horizontal)
         }
         .frame(minWidth: 400, idealWidth: 500, maxWidth: .infinity, minHeight: 600, idealHeight: 800, maxHeight: .infinity)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    audioCaptureService.openRecordingsFolder()
+                }) {
+                    Image(systemName: "folder")
+                        .font(.title2)
+                }
+                .help("Open Recordings Folder")
+            }
+        }
     }
 }
 
