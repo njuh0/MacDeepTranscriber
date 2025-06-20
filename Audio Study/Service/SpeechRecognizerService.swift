@@ -304,6 +304,7 @@ class SpeechRecognizerService: ObservableObject {
         if clearSession {
             sessionTranscriptions = []
         }
+        print("🗑️ Apple Speech: History cleared (history: \(clearHistory), session: \(clearSession))")
     }
     
     // MARK: - Session Management
@@ -330,7 +331,9 @@ class SpeechRecognizerService: ObservableObject {
     // Clear session transcriptions (call after saving or when starting new session)
     func clearSessionTranscriptions() {
         sessionTranscriptions = []
-        print("Session transcriptions cleared")
+        // Update session JSON file immediately to reflect the cleared state
+        saveAppleHistoryToJSONRealTime()
+        print("Session transcriptions cleared and session JSON updated")
     }
     
     // Save all session transcriptions to permanent storage (call when stop capture is clicked)

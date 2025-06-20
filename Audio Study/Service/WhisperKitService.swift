@@ -58,9 +58,7 @@ class WhisperKitService: ObservableObject {
     private var lastBufferResetTime: Date = Date()  // Время последнего сброса или очистки буфера
     private var isStopping: Bool = false  // Флаг для предотвращения двойного сохранения при остановке
     
-    @Published var transcriptionList: [TranscriptionEntry] = [] // Updated type
-    
-    // Session transcriptions (temporary storage during recording)
+    // Session transcriptions (now the only storage - serves as both session and permanent history)
     @Published var sessionTranscriptions: [TranscriptionEntry] = []
     
     // WhisperKit instance (will be uncommented when package is added)
@@ -82,27 +80,12 @@ class WhisperKitService: ObservableObject {
         self.maxBufferDuration = maxBufferDuration
         
         initializeWhisperKit()
-        loadWhisperHistoryFromJSON() // Load history
     }
 
     private func getDocumentsDirectory() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    private func saveWhisperHistoryToJSON() {
-        let fileURL = getDocumentsDirectory().appendingPathComponent("whisper_history.json")
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-
-        do {
-            let data = try encoder.encode(self.transcriptionList)
-            try data.write(to: fileURL, options: [.atomicWrite])
-            print("Successfully saved Whisper transcription history to \(fileURL.path)")
-        } catch {
-            print("Error saving Whisper transcription history to JSON: \(error.localizedDescription)")
-        }
-    }
-    
     /// Saves session transcriptions to JSON in real-time (during recording)
     private func saveWhisperHistoryToJSONRealTime() {
         let fileURL = getDocumentsDirectory().appendingPathComponent("whisper_history_session.json")
@@ -116,25 +99,6 @@ class WhisperKitService: ObservableObject {
             print("✅ Real-time saved Whisper session history (\(sessionTranscriptions.count) entries) to JSON")
         } catch {
             print("❌ Error saving Whisper session history to JSON (real-time): \(error.localizedDescription)")
-        }
-    }
-
-    private func loadWhisperHistoryFromJSON() {
-        let fileURL = getDocumentsDirectory().appendingPathComponent("whisper_history.json")
-        
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("Whisper history JSON file does not exist. Starting with empty history.")
-            return
-        }
-
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let decoder = JSONDecoder()
-            self.transcriptionList = try decoder.decode([TranscriptionEntry].self, from: data)
-            print("Successfully loaded Whisper transcription history from JSON. Count: \(self.transcriptionList.count)")
-        } catch {
-            print("Error loading Whisper transcription history from JSON: \(error.localizedDescription). Starting with empty history.")
-            self.transcriptionList = [] // Ensure clean state on error
         }
     }
     
@@ -292,9 +256,31 @@ class WhisperKitService: ObservableObject {
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
         
-        // Don't add any more transcriptions to session - they should already be captured
-        // during the periodic transcription process. Just clean up and stop.
-        print("📝 WhisperKit: Session transcriptions already captured: \(sessionTranscriptions.count) entries")
+        // Save the last accumulated text if it exists and hasn't been saved yet
+        let trimmedAccumulatedText = accumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedAccumulatedText.isEmpty {
+            // Check if this text is already in the session transcriptions
+            let alreadyExists = sessionTranscriptions.contains { entry in
+                let existingText = entry.transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+                return existingText == trimmedAccumulatedText || 
+                       calculateTextSimilarity(existingText.lowercased(), trimmedAccumulatedText.lowercased()) > 0.9
+            }
+            
+            if !alreadyExists {
+                let finalEntry = TranscriptionEntry(
+                    id: UUID(),
+                    date: Date(),
+                    transcription: trimmedAccumulatedText
+                )
+                sessionTranscriptions.append(finalEntry)
+                saveWhisperHistoryToJSONRealTime()
+                print("💾 WhisperKit: Saved final accumulated text before stopping: '\(trimmedAccumulatedText.prefix(50))...'")
+            } else {
+                print("ℹ️ WhisperKit: Final accumulated text already exists in session, not saving duplicate")
+            }
+        }
+        
+        print("📝 WhisperKit: Session transcriptions after stop: \(sessionTranscriptions.count) entries")
         
         bufferLock.lock()
         audioBuffers.removeAll()
@@ -832,22 +818,14 @@ extension WhisperKitService {
             for (index, entry) in sessionTranscriptions.enumerated() {
                 print("  \(index + 1). [\(entry.date)] \(entry.transcription.prefix(50))...")
             }
+            
+            // Save current session data to real-time JSON file only
+            saveWhisperHistoryToJSONRealTime()
+            print("✅ Saved \(sessionTranscriptions.count) WhisperKit transcriptions to session JSON")
         }
         
-        // Move session transcriptions to permanent history (in memory only)
-        let initialPermanentCount = transcriptionList.count
-        transcriptionList.append(contentsOf: sessionTranscriptions)
-        let finalPermanentCount = transcriptionList.count
-        
-        print("✅ Moved \(sessionTranscriptions.count) WhisperKit transcriptions to permanent storage (in memory)")
-        print("📊 Permanent history: \(initialPermanentCount) → \(finalPermanentCount) entries")
-        
-        // Session JSON file already contains all data via real-time saving
-        // No additional JSON saving needed here
-        print("📄 All data already saved in session JSON via real-time updates")
-        
-        // Don't clear session here - keep them visible in UI until new session starts
-        print("👁️ WhisperKit session transcriptions moved but kept visible in UI")
+        // Keep sessionTranscriptions for UI display
+        print("👁️ WhisperKit session transcriptions kept visible in UI")
     }
     
     func getSessionTranscriptions() -> [TranscriptionEntry] {
@@ -861,6 +839,10 @@ extension WhisperKitService {
         lastTranscriptionLength = 0
         lastContextTranscription = ""
         isStopping = false
+        
+        // Clear only session JSON file since we only use real-time storage
+        saveWhisperHistoryToJSONRealTime()
+        print("🗑️ WhisperKit session storage cleared")
     }
     
     // MARK: - Language and Task Configuration

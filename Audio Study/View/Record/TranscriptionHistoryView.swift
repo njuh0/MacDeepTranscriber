@@ -122,7 +122,7 @@ struct TranscriptionHistoryView: View {
     private var dualEngineContent: some View {
         if selectedHistoryTab == 0 {
             WhisperKitTranscriptionListView(
-                transcriptions: audioCaptureService.transcriptionList,
+                transcriptions: audioCaptureService.whisperKitService.sessionTranscriptions,
                 emptyMessage: "No WhisperKit transcriptions yet."
             )
         } else {
@@ -135,7 +135,7 @@ struct TranscriptionHistoryView: View {
     
     private var whisperKitOnlyContent: some View {
         WhisperKitTranscriptionListView(
-            transcriptions: audioCaptureService.transcriptionList,
+            transcriptions: audioCaptureService.whisperKitService.sessionTranscriptions,
             emptyMessage: "No WhisperKit transcriptions yet."
         )
     }

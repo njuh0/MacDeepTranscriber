@@ -9,7 +9,7 @@ struct ControlsView: View {
             if !audioCaptureService.selectedSpeechEngines.isEmpty &&
                (!audioCaptureService.recognizedText.isEmpty ||
                 !audioCaptureService.appleSpeechText.isEmpty ||
-                !audioCaptureService.transcriptionList.isEmpty ||
+                !audioCaptureService.whisperKitService.sessionTranscriptions.isEmpty ||
                 !audioCaptureService.appleSpeechHistory.isEmpty) {
                 HStack {
                     if !audioCaptureService.appleSpeechHistory.isEmpty && audioCaptureService.selectedSpeechEngines.contains(.appleSpeech) {
@@ -20,9 +20,9 @@ struct ControlsView: View {
                         .foregroundColor(.green)
                     }
 
-                    if !audioCaptureService.transcriptionList.isEmpty && audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
+                    if !audioCaptureService.whisperKitService.sessionTranscriptions.isEmpty && audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
                         Button("Clear WhisperKit History") {
-                            audioCaptureService.clearTranscriptionList()
+                            audioCaptureService.whisperKitService.clearSession()
                         }
                         .buttonStyle(.bordered)
                         .foregroundColor(.blue)
