@@ -27,6 +27,19 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return "gearshape.circle"
         }
     }
+    
+    func iconForState(isRecording: Bool) -> String {
+        switch self {
+        case .record:
+            return isRecording ? "record.circle.fill" : "mic.circle"
+        case .learnWords:
+            return "book.circle"
+        case .aiChat:
+            return "bubble.left.and.bubble.right.circle"
+        case .settings:
+            return "gearshape.circle"
+        }
+    }
 }
 
 class NavigationModel: ObservableObject {
