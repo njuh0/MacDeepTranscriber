@@ -1,152 +1,420 @@
 import Foundation
 import Speech
 import AVFoundation
+import Combine
 
-enum AppError: Error, LocalizedError {
-    case speechRecognizerNotAvailable
-    case audioEngineSetupFailed
-    case inputDeviceNotConfigured
-    case invalidAudioFormat
-    case microphonePermissionDenied
-    case speechRecognitionTaskFailed(Error)
-    case genericError(String)
+@MainActor
+class SpeechRecognizerService: ObservableObject {
+    @Published var isRecognizing: Bool = false
+    @Published var recognizedText: String = ""
+    @Published var sessionTranscriptions: [TranscriptionEntry] = [] // Updated type
+    @Published var errorMessage: String?
+    @Published var isAvailable: Bool = false
+    @Published var selectedLocale: Locale = Locale(identifier: "en-US")
+    
+    // Temporary storage during recording session
+    private var permanentHistory: [TranscriptionEntry] = []
+    
+    private var previousRecognizedText: String = "" // Для отслеживания изменений
+    private var significantChangeThreshold: Int = 5 // Минимальная разница в символах для сохранения
 
-    var localizedDescription: String {
-        switch self {
-        case .speechRecognizerNotAvailable:
-            return "Speech recognition is not available on this device or for this language."
-        case .audioEngineSetupFailed:
-            return "Failed to set up the audio engine."
-        case .inputDeviceNotConfigured:
-            return "No audio input device is configured or available. Ensure BlackHole is selected as a system input."
-        case .invalidAudioFormat:
-            return "Invalid audio format from the input device."
-        case .microphonePermissionDenied:
-            return "Microphone access is denied. Please enable it in System Settings (Privacy & Security -> Microphone)."
-        case .speechRecognitionTaskFailed(let error):
-            return "Speech recognition task failed: \(error.localizedDescription)"
-        case .genericError(let message):
-            return message
-        }
-    }
-}
-
-
-// --- FIX START ---
-// Make SpeechRecognizerService inherit from NSObject
-class SpeechRecognizerService: NSObject {
-// --- FIX END ---
-    private let speechRecognizer: SFSpeechRecognizer?
+    // For handling continuous recognition
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var audioEngine: AVAudioEngine?
+    private var cancellables = Set<AnyCancellable>()
     
-    // Callbacks for external observation
-    var onError: ((Error) -> Void)?
-    var onAvailabilityChange: ((Bool) -> Void)?
-    var onRecognitionResult: ((String) -> Void)?
+    // Available locales for speech recognition
+    private(set) var availableLocales: [Locale] = []
+    
+    init() {
+        setupSpeechRecognition()
+        updateAvailableLocales()
+        loadAppleHistoryFromJSON() // Load history
+    }
 
-    @Published var isRecognitionAvailable: Bool = false
+    private func getDocumentsDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
 
-    override init() { // When inheriting from NSObject, override init() is often needed if you have a custom initializer
-        // Initialize with default locale or specify one
-        // speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private func saveAppleHistoryToJSON() {
+        let fileURL = getDocumentsDirectory().appendingPathComponent("apple_history.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted // For readable JSON
 
-        // Call super.init() before accessing self properties
-        super.init()
+        do {
+            let data = try encoder.encode(self.permanentHistory)
+            try data.write(to: fileURL, options: [.atomic])
+            print("Successfully saved Apple transcription history to \(fileURL.path)")
+        } catch {
+            print("Error saving Apple transcription history to JSON: \(error.localizedDescription)")
+        }
+    }
 
-        // Check availability and set up availability handler
-        speechRecognizer?.delegate = self // Make this class the delegate for availability changes
+    private func loadAppleHistoryFromJSON() {
+        let fileURL = getDocumentsDirectory().appendingPathComponent("apple_history.json")
+        
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("Apple history JSON file does not exist. Starting with empty history.")
+            return
+        }
 
-        // Request speech recognition authorization
-        SFSpeechRecognizer.requestAuthorization { [weak self] authStatus in // Added weak self capture list
-            DispatchQueue.main.async { // Ensure UI updates happen on the main thread
-                guard let self = self else { return } // Safely unwrap self
-                switch authStatus {
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            self.permanentHistory = try decoder.decode([TranscriptionEntry].self, from: data)
+            print("Successfully loaded Apple transcription history from JSON. Count: \(self.permanentHistory.count)")
+        } catch {
+            print("Error loading Apple transcription history from JSON: \(error.localizedDescription). Starting with empty history.")
+            self.permanentHistory = [] // Ensure clean state on error
+        }
+    }
+    
+    private func setupSpeechRecognition() {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            Task { @MainActor in
+                guard let self = self else { return }
+                switch status {
                 case .authorized:
-                    print("Speech recognition authorization granted.")
-                    self.isRecognitionAvailable = true
-                case .denied, .restricted, .notDetermined:
-                    print("Speech recognition authorization denied.")
-                    self.isRecognitionAvailable = false
-                    self.onError?(AppError.speechRecognizerNotAvailable)
+                    self.isAvailable = true
+                    self.errorMessage = nil
+                    self.setupRecognizer(with: self.selectedLocale)
+                case .denied:
+                    self.isAvailable = false
+                    self.errorMessage = "Speech recognition authorization denied"
+                case .restricted:
+                    self.isAvailable = false
+                    self.errorMessage = "Speech recognition is restricted on this device"
+                case .notDetermined:
+                    self.isAvailable = false
+                    self.errorMessage = "Speech recognition not yet authorized"
                 @unknown default:
-                    print("Unknown speech recognition authorization status.")
-                    self.isRecognitionAvailable = false
-                    self.onError?(AppError.speechRecognizerNotAvailable)
+                    self.isAvailable = false
+                    self.errorMessage = "Unknown authorization status for speech recognition"
                 }
-                self.onAvailabilityChange?(self.isRecognitionAvailable) // Notify about initial availability
             }
+        }
+    }
+    
+    private func updateAvailableLocales() {
+        availableLocales = SFSpeechRecognizer.supportedLocales().sorted(by: { 
+            $0.identifier < $1.identifier 
+        })
+    }
+    
+    func changeLocale(to locale: Locale) {
+        selectedLocale = locale
+        setupRecognizer(with: locale)
+    }
+    
+    private func setupRecognizer(with locale: Locale) {
+        speechRecognizer = SFSpeechRecognizer(locale: locale)
+        speechRecognizer?.supportsOnDeviceRecognition = true
+    }
+    
+    func startRecognition() async throws {
+        guard !isRecognizing else { return }
+        
+        // Check availability
+        guard isAvailable, let recognizer = speechRecognizer else {
+            throw NSError(
+                domain: "SpeechRecognizerService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Speech recognition is not available"]
+            )
         }
         
-        // Set initial availability based on current recognizer state (might be nil)
-        isRecognitionAvailable = speechRecognizer?.isAvailable ?? false
-    }
-
-    /// Starts a new speech recognition task.
-    /// - Parameter audioFormat: The audio format of the buffers that will be appended.
-    func startRecognition(audioFormat: AVAudioFormat) throws {
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
-            throw AppError.speechRecognizerNotAvailable
-        }
-        
-        if recognitionTask != nil {
-            stopRecognition() // Stop any previous task
-        }
-
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        recognitionRequest?.shouldReportPartialResults = true // Get results as they are being recognized
-
-        guard let recognitionRequest = recognitionRequest else {
-            fatalError("Unable to created a SFSpeechAudioBufferRecognitionRequest object")
-        }
-
-        // Start the recognition task
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            var isFinal = false
-            if let result = result {
-                self?.onRecognitionResult?(result.bestTranscription.formattedString)
-                isFinal = result.isFinal
-                print("Recognized Text: \(result.bestTranscription.formattedString) (Final: \(isFinal))")
-            }
-            
-            if error != nil || isFinal {
-                // If there's an error or the task is final, stop the recognition
-                self?.stopRecognition()
-                if let error = error {
-                    self?.onError?(AppError.speechRecognitionTaskFailed(error))
-                    print("Speech recognition error: \(error.localizedDescription)")
-                }
-                if isFinal {
-                    print("Speech recognition task finished.")
-                }
-            }
-        }
-        print("Speech recognition task started.")
-    }
-
-    /// Appends an audio buffer to the recognition request.
-    /// - Parameter audioBuffer: The audio buffer to append.
-    func appendAudioBuffer(_ audioBuffer: AVAudioPCMBuffer) {
-        recognitionRequest?.append(audioBuffer)
-    }
-
-    /// Stops the current speech recognition task.
-    func stopRecognition() {
-        recognitionRequest?.endAudio() // Tell the request that no more audio will be appended
-        recognitionTask?.cancel() // Cancel the task if it's still running
+        // Reset any existing task
+        recognitionTask?.cancel()
         recognitionTask = nil
-        recognitionRequest = nil
-        print("Speech recognition stopped.")
-    }
-}
-
-// MARK: - SFSpeechRecognizerDelegate
-extension SpeechRecognizerService: SFSpeechRecognizerDelegate {
-    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
-        DispatchQueue.main.async { // Ensure UI updates on main thread
-            self.isRecognitionAvailable = available
-            self.onAvailabilityChange?(available)
+                
+        // Create and configure the speech recognition request
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        recognitionRequest?.requiresOnDeviceRecognition = true
+        recognitionRequest?.shouldReportPartialResults = true
+        recognitionRequest?.addsPunctuation = true
+        
+        // Start audio engine if it doesn't exist
+        audioEngine = AVAudioEngine()
+        
+        // Configure audio input
+        let inputNode = audioEngine!.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        // Install a tap on the audio input
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] (buffer, _) in
+            self?.recognitionRequest?.append(buffer)
         }
+        
+        // Start the audio engine
+        audioEngine!.prepare()
+        try audioEngine!.start()
+        
+        // Start recognition
+        recognitionTask = recognizer.recognitionTask(with: recognitionRequest!) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                if let error = error {
+                    // Don't show cancellation errors as they are expected when stopping recognition
+                    let nsError = error as NSError
+                    
+                    // Check for various cancellation and expected stop-related error patterns
+                    let errorDescription = nsError.localizedDescription.lowercased()
+                    let isExpectedStopError = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 203 ||
+                                            nsError.domain == "com.apple.speech.speechrecognitionerror" && nsError.code == 1 ||
+                                            errorDescription.contains("cancel") ||
+                                            errorDescription.contains("cancelled") ||
+                                            errorDescription.contains("no speech detected")
+                    
+                    if isExpectedStopError {
+                        // Recognition was cancelled or no speech detected - this is expected when stopping, not an error
+                        print("🔕 Apple Speech recognition stopped (expected): \(error.localizedDescription)")
+                    } else {
+                        // Only show actual errors, not expected stop conditions
+                        self.errorMessage = "Recognition error: \(error.localizedDescription)"
+                        print("❌ Apple Speech recognition error: \(error)")
+                    }
+                    self.stopRecognition()
+                    return
+                }
+                
+                if let result = result {
+                    let text = result.bestTranscription.formattedString
+                    if(text.isEmpty){
+                        print("No recognized text")
+                    }
+                    // Проверяем и сохраняем значительные изменения
+                    self.checkAndSaveSignificantChange(newText: text)
+                    self.recognizedText = text
+                }
+                
+                if result?.isFinal == true {
+                    // Add final result to session transcriptions
+                    if let finalText = result?.bestTranscription.formattedString,
+                       !finalText.isEmpty {
+                        let entry = TranscriptionEntry(date: Date(), transcription: finalText)
+                        self.sessionTranscriptions.append(entry)
+                        print("Session transcription added (final): \(finalText)")
+                    }
+                    self.stopRecognition()
+                }
+            }
+        }
+        
+        isRecognizing = true
+        errorMessage = nil
+    }
+    
+    func stopRecognition() {
+        print("🛑 Apple Speech: stopRecognition called")
+        
+        // Add final recognized text to session transcriptions if it's not empty 
+        // and different from the last entry in the session.
+        let finalText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("📝 Final recognized text: '\(finalText)'")
+        
+        if !finalText.isEmpty {
+            if sessionTranscriptions.last?.transcription != finalText {
+                let entry = TranscriptionEntry(date: Date(), transcription: finalText)
+                sessionTranscriptions.append(entry)
+                print("✅ Session transcription added (stopRecognition): \(finalText)")
+            } else {
+                print("🚫 Final text already exists in session, not adding duplicate")
+            }
+        } else {
+            print("🚫 No final text to add to session")
+        }
+        
+        audioEngine?.stop()
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        
+        recognitionRequest = nil
+        recognitionTask = nil
+        
+        isRecognizing = false
+        errorMessage = nil // Clear any error message when stopping normally
+        
+        // Don't clear session here - it should remain visible in UI until explicitly saved to permanent storage
+        print("✅ Apple Speech recognition stopped. Session transcriptions count: \(sessionTranscriptions.count)")
+    }
+    
+    func clearRecognizedText(clearHistory: Bool = false, clearSession: Bool = false) {
+        recognizedText = ""
+        previousRecognizedText = ""
+        if clearHistory {
+            permanentHistory = []
+        }
+        if clearSession {
+            sessionTranscriptions = []
+        }
+    }
+    
+    // MARK: - Session Management
+    
+    func startNewSession() {
+        sessionTranscriptions.removeAll()
+        previousRecognizedText = ""
+        print("Started new Apple Speech session")
+    }
+    
+    func saveSessionToPermanentStorage() {
+        // Move session transcriptions to permanent history
+        permanentHistory.append(contentsOf: sessionTranscriptions)
+        
+        // Save to JSON file
+        saveAppleHistoryToJSON()
+        
+        print("Saved \(sessionTranscriptions.count) Apple Speech transcriptions to permanent storage")
+        
+        // Don't clear session here - keep them visible in UI until new session starts
+        print("Session transcriptions saved but kept visible in UI")
+    }
+    
+    // Clear session transcriptions (call after saving or when starting new session)
+    func clearSessionTranscriptions() {
+        sessionTranscriptions = []
+        print("Session transcriptions cleared")
+    }
+    
+    // Save all session transcriptions to permanent storage (call when stop capture is clicked)
+    func saveSessionTranscriptionsToPermanentStorage() {
+        print("💾 Apple Speech: saveSessionTranscriptionsToPermanentStorage called")
+        print("📝 Current session transcriptions count: \(sessionTranscriptions.count)")
+        
+        if !sessionTranscriptions.isEmpty {
+            print("📝 Session transcriptions to save:")
+            for (index, entry) in sessionTranscriptions.enumerated() {
+                print("  \(index + 1). [\(entry.date)] \(entry.transcription.prefix(50))...")
+            }
+        }
+        
+        // Add all session transcriptions to the permanent history
+        let initialPermanentCount = permanentHistory.count
+        permanentHistory.append(contentsOf: sessionTranscriptions)
+        let finalPermanentCount = permanentHistory.count
+        
+        print("✅ Saved \(sessionTranscriptions.count) session transcriptions to permanent storage")
+        print("📊 Permanent history: \(initialPermanentCount) → \(finalPermanentCount) entries")
+        
+        // Save to JSON file
+        saveAppleHistoryToJSON()
+        
+        // Don't clear session transcriptions here - keep them visible in UI
+        // They will be cleared when starting a new recording session
+        print("👁️ Session transcriptions saved but kept visible in UI")
+    }
+    
+    // Get current session transcriptions
+    func getSessionTranscriptions() -> [TranscriptionEntry] {
+        return sessionTranscriptions
+    }
+    
+    // Get session transcriptions as formatted text
+    func getSessionTranscriptionsText() -> String {
+        return sessionTranscriptions.map { $0.transcription }.joined(separator: "\n")
+    }
+    
+    // Функция для расчета схожести двух текстов
+    private func calculateTextSimilarity(_ text1: String, _ text2: String) -> Double {
+        // Если один из текстов пустой, возвращаем 0
+        if text1.isEmpty || text2.isEmpty {
+            return 0.0
+        }
+        
+        // Если тексты идентичны, возвращаем 1
+        if text1 == text2 {
+            return 1.0
+        }
+        
+        // Простой алгоритм - проверяем содержание одного текста в другом
+        if text1.count > text2.count {
+            if text1.contains(text2) {
+                return Double(text2.count) / Double(text1.count)
+            }
+        } else {
+            if text2.contains(text1) {
+                return Double(text1.count) / Double(text2.count)
+            }
+        }
+        
+        // Более продвинутая проверка - считаем общие слова
+        let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        
+        if words1.isEmpty || words2.isEmpty {
+            return 0.1 // Return a small non-zero if one has words and the other doesn't after split, but were non-empty initially
+        }
+        
+        let commonWords = words1.intersection(words2)
+        let similarity = Double(commonWords.count) / Double(max(words1.count, words2.count))
+        
+        return similarity
+    }
+    
+    // Get a list of all supported locales with their display names
+    func getSupportedLocalesWithNames() -> [(Locale, String)] {
+        return availableLocales.map { locale in
+            let displayName = (locale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+            return (locale, displayName)
+        }.sorted { $0.1 < $1.1 }
+    }
+    
+    // Check if the new transcription is significantly different from the previous one
+    private func checkAndSaveSignificantChange(newText: String) {
+        let trimmedOldText = previousRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNewText = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let shortTextMaxLength = 10 // Max length for a text to be considered "short"
+        let similarityThresholdForShortText = 0.1 // Stricter threshold for short texts
+        let similarityThresholdForLongText = 0.5 // Regular threshold for longer texts
+
+        if !trimmedOldText.isEmpty && !trimmedNewText.isEmpty {
+            // Check for divergence: neither text is a prefix of the other.
+            if !trimmedNewText.hasPrefix(trimmedOldText) && !trimmedOldText.hasPrefix(trimmedNewText) {
+                let similarity = calculateTextSimilarity(trimmedOldText, trimmedNewText)
+                // Log the similarity and which threshold will be used
+                var effectiveThreshold = similarityThresholdForLongText
+                var textCategory = "long"
+                if trimmedOldText.count < shortTextMaxLength {
+                    effectiveThreshold = similarityThresholdForShortText
+                    textCategory = "short"
+                }
+                print("Similarity: \(String(format: "%.2f", similarity)) for old ('\(textCategory)' text): '\(trimmedOldText)' | new: '\(trimmedNewText)'. Effective threshold: \(effectiveThreshold)")
+
+                var shouldSaveOldText = false
+                if trimmedOldText.count < shortTextMaxLength {
+                    if similarity < similarityThresholdForShortText {
+                        shouldSaveOldText = true
+                    }
+                } else {
+                    if similarity < similarityThresholdForLongText {
+                        shouldSaveOldText = true
+                    }
+                }
+
+                if shouldSaveOldText {
+                    if sessionTranscriptions.last?.transcription != trimmedOldText {
+                        let entry = TranscriptionEntry(date: Date(), transcription: trimmedOldText)
+                        sessionTranscriptions.append(entry)
+                        print("Session transcription added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
+                    }
+                }
+            }
+        }
+        previousRecognizedText = newText // Always update to the latest text from the recognizer
+    }
+    
+
+    
+    // Start a new recording session (clears previous session transcriptions)
+    func startNewRecordingSession() {
+        clearSessionTranscriptions()
+        clearRecognizedText()
+        print("Started new recording session")
     }
 }

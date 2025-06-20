@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Audio Study}",
+            "name": "Debug AudioStudy",
+            "program": "${workspaceFolder:Audio Study}/.build/debug/AudioStudy",
+            "preLaunchTask": "swift: Build Debug AudioStudy"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Audio Study}",
+            "name": "Release AudioStudy",
+            "program": "${workspaceFolder:Audio Study}/.build/release/AudioStudy",
+            "preLaunchTask": "swift: Build Release AudioStudy"
+        }
+    ]
+}

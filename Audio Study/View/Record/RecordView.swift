@@ -1,17 +1,21 @@
+//
+//  RecordView.swift
+//  Audio Study
+//
+//  Created on 20.06.2025.
+//
+
 import SwiftUI
 
-struct ContentView: View {
-    @StateObject private var audioCaptureService = AudioCaptureService()  // Simpler initialization
-    @State private var selectedHistoryTab: Int = 0  // 0 - WhisperKit, 1 - Apple Speech
+struct RecordView: View {
+    @StateObject private var audioCaptureService = AudioCaptureService()
+    @State private var selectedHistoryTab: Int = 0
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) { // Added spacing to the main VStack
-                Text("Record")
-                    .font(.largeTitle)
-                    .padding(.top) // Adjusted padding
-
+            VStack(spacing: 16) {
                 SpeechEngineSelectionView(audioCaptureService: audioCaptureService)
+                    .padding(.top, 20)
 
                 // Unified Language Selection (shown when any engine is selected)
                 if !audioCaptureService.selectedSpeechEngines.isEmpty {
@@ -45,13 +49,12 @@ struct ContentView: View {
 
                 Spacer(minLength: 30)
             }
-            .padding(.horizontal) // Add horizontal padding to the VStack
+            .padding(.horizontal)
         }
-        .frame(minWidth: 400, idealWidth: 500, maxWidth: .infinity, minHeight: 600, idealHeight: 800, maxHeight: .infinity) // Set a flexible frame for the ScrollView
+        .frame(minWidth: 400, idealWidth: 500, maxWidth: .infinity, minHeight: 600, idealHeight: 800, maxHeight: .infinity)
     }
 }
 
-// Ensure Previews are removed if not needed or updated
-// #Preview {
-//     ContentView()
-// }
+#Preview {
+    RecordView()
+}
