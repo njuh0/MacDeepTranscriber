@@ -9,12 +9,13 @@ import SwiftUI
 
 struct MainView: View {
     @StateObject private var navigationModel = NavigationModel()
+    @StateObject private var audioCaptureService = AudioCaptureService()
     
     var body: some View {
         NavigationSplitView(columnVisibility: $navigationModel.columnVisibility) {
             SidebarView(navigationModel: navigationModel)
         } detail: {
-            DetailView(navigationModel: navigationModel)
+            DetailView(navigationModel: navigationModel, audioCaptureService: audioCaptureService)
         }
         .navigationSplitViewStyle(.prominentDetail)
     }
@@ -36,13 +37,14 @@ struct SidebarView: View {
 
 struct DetailView: View {
     @ObservedObject var navigationModel: NavigationModel
+    @ObservedObject var audioCaptureService: AudioCaptureService
     
     var body: some View {
         Group {
             if let selectedItem = navigationModel.selectedItem {
                 switch selectedItem {
                 case .record:
-                    RecordView()
+                    RecordView(audioCaptureService: audioCaptureService)
                 case .learnWords:
                     LearnWordsView()
                 case .aiChat:

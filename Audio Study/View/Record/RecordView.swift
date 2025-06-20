@@ -8,8 +8,18 @@
 import SwiftUI
 
 struct RecordView: View {
-    @StateObject private var audioCaptureService = AudioCaptureService()
+    @ObservedObject var audioCaptureService: AudioCaptureService
     @State private var selectedHistoryTab: Int = 0
+
+    // Default initializer for convenience
+    init() {
+        self.audioCaptureService = AudioCaptureService()
+    }
+    
+    // Initializer with external service
+    init(audioCaptureService: AudioCaptureService) {
+        self.audioCaptureService = audioCaptureService
+    }
 
     var body: some View {
         ScrollView {
