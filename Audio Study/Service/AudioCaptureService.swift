@@ -23,6 +23,8 @@ class AudioCaptureService: ObservableObject {
     @Published var appleSpeechText: String = ""
     @Published var appleSpeechHistory: [String] = []
     
+    // No need for combined persistence service anymore
+    
     // Old property kept for compatibility during refactoring
     var useAppleSpeechInParallel: Bool {
         get { selectedSpeechEngines.contains(.appleSpeech) }
@@ -70,6 +72,9 @@ class AudioCaptureService: ObservableObject {
         
         // Set up callbacks after all properties are initialized
         setupCallbacks()
+        
+        // Individual services load their own histories automatically
+        print("ℹ️ AudioCaptureService initialized - individual engines manage their own JSON files")
     }
     
     private func setupCallbacks() {
@@ -124,6 +129,8 @@ class AudioCaptureService: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (sessionHistory: [TranscriptionEntry]) in
                 self?.updateAppleSpeechDisplayList()
+                // Also update the combined transcription list and save to JSON
+                self?.updateWhisperKitDisplayList()
             }
             .store(in: &cancellables)
             
@@ -276,11 +283,15 @@ class AudioCaptureService: ObservableObject {
     // Method to clear transcription history
     func clearTranscriptionHistory() {
         transcriptionList = []
+        // Clear individual engine histories - they handle their own JSON files
+        speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
     
     
     func clearTranscriptionList() {
         transcriptionList = []
+        // Clear individual engine histories - they handle their own JSON files  
+        speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
 
     func startCapture() {
@@ -680,7 +691,10 @@ class AudioCaptureService: ObservableObject {
             speechRecognizerService.saveSessionTranscriptionsToPermanentStorage()
         }
         
-        print("✅ Session transcriptions saved to permanent storage")
+        // Update the combined transcription list (individual services save their own JSON)
+        updateWhisperKitDisplayList()
+        
+        print("✅ Session transcriptions saved to permanent storage and JSON updated")
         statusMessage = "Session transcriptions saved to storage"
     }
     
@@ -706,13 +720,40 @@ class AudioCaptureService: ObservableObject {
     
     // Helper method to update WhisperKit display list (combines permanent + session)
     private func updateWhisperKitDisplayList() {
-        // Always combine permanent transcriptions with current session transcriptions
-        let permanentList = whisperKitService.transcriptionList
-        let sessionList = whisperKitService.sessionTranscriptions
+        updateCombinedTranscriptionList()
+    }
+    
+    // Helper method to update the combined transcription list from all active speech engines
+    private func updateCombinedTranscriptionList() {
+        var combinedList: [TranscriptionEntry] = []
         
-        // Always show both permanent and session transcriptions
-        // Session transcriptions will remain visible until a new session starts or history is cleared
-        transcriptionList = permanentList + sessionList
+        // Add WhisperKit transcriptions (permanent + session)
+        if selectedSpeechEngines.contains(.whisperKit) {
+            let permanentList = whisperKitService.transcriptionList
+            let sessionList = whisperKitService.sessionTranscriptions
+            combinedList.append(contentsOf: permanentList + sessionList)
+        }
+        
+        // Add Apple Speech transcriptions (permanent + session)  
+        if selectedSpeechEngines.contains(.appleSpeech) {
+            // We can only access session transcriptions, permanent ones are handled by the service itself
+            let sessionList = speechRecognizerService.sessionTranscriptions
+            combinedList.append(contentsOf: sessionList)
+        }
+        
+        // Sort by date to maintain chronological order
+        combinedList.sort { entry1, entry2 in
+            // Parse the ISO8601 date strings for comparison
+            let formatter = DateUtil.iso8601Formatter
+            let date1 = formatter.date(from: entry1.date) ?? Date.distantPast
+            let date2 = formatter.date(from: entry2.date) ?? Date.distantPast
+            return date1 < date2
+        }
+        
+        transcriptionList = combinedList
+        
+        // Individual services handle their own JSON saving automatically
+        // No need to save combined JSON here
     }
     
     // Helper method to update Apple Speech display list (shows session transcriptions)
@@ -722,4 +763,5 @@ class AudioCaptureService: ObservableObject {
         let sessionList = speechRecognizerService.sessionTranscriptions
         appleSpeechHistory = sessionList.map { $0.transcription }
     }
+
 }

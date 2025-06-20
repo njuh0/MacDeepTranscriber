@@ -43,12 +43,60 @@ class SpeechRecognizerService: ObservableObject {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted // For readable JSON
 
+        // Create directory if it doesn't exist
+        do {
+            try FileManager.default.createDirectory(at: getDocumentsDirectory(), withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            print("❌ Failed to create documents directory: \(error.localizedDescription)")
+            return
+        }
+
         do {
             let data = try encoder.encode(self.permanentHistory)
-            try data.write(to: fileURL, options: [.atomic])
-            print("Successfully saved Apple transcription history to \(fileURL.path)")
+            try data.write(to: fileURL, options: [.atomicWrite])
+            print("✅ Successfully saved Apple transcription history (\(self.permanentHistory.count) entries) to: \(fileURL.path)")
         } catch {
-            print("Error saving Apple transcription history to JSON: \(error.localizedDescription)")
+            print("❌ Error saving Apple transcription history to JSON: \(error.localizedDescription)")
+            print("❌ File path: \(fileURL.path)")
+        }
+    }
+    
+    /// Saves session transcriptions to JSON in real-time (during recording)
+    private func saveAppleHistoryToJSONRealTime() {
+        let documentsDir = getDocumentsDirectory()
+        let fileURL = documentsDir.appendingPathComponent("apple_history_session.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+
+        print("🔍 Apple Speech real-time save attempt:")
+        print("  📁 Documents directory: \(documentsDir.path)")
+        print("  📄 File URL: \(fileURL.path)")
+        print("  📊 Session transcriptions count: \(sessionTranscriptions.count)")
+
+        // Create directory if it doesn't exist
+        do {
+            try FileManager.default.createDirectory(at: documentsDir, withIntermediateDirectories: true, attributes: nil)
+            print("  ✅ Documents directory confirmed/created")
+        } catch {
+            print("  ❌ Failed to create documents directory: \(error.localizedDescription)")
+            return
+        }
+
+        // Save only session transcriptions during recording
+        do {
+            let data = try encoder.encode(sessionTranscriptions)
+            try data.write(to: fileURL, options: [.atomicWrite])
+            
+            // Verify file was actually written
+            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+            let fileSize = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int
+            
+            print("  ✅ Real-time saved Apple Speech session history (\(sessionTranscriptions.count) entries)")
+            print("  📄 File exists: \(fileExists), Size: \(fileSize ?? 0) bytes")
+            print("  📍 Full path: \(fileURL.path)")
+        } catch {
+            print("  ❌ Error saving Apple Speech session history to JSON (real-time): \(error.localizedDescription)")
+            print("  ❌ File path: \(fileURL.path)")
         }
     }
 
@@ -197,6 +245,8 @@ class SpeechRecognizerService: ObservableObject {
                         let entry = TranscriptionEntry(date: Date(), transcription: finalText)
                         self.sessionTranscriptions.append(entry)
                         print("Session transcription added (final): \(finalText)")
+                        // Save to JSON immediately
+                        self.saveAppleHistoryToJSONRealTime()
                     }
                     self.stopRecognition()
                 }
@@ -220,6 +270,8 @@ class SpeechRecognizerService: ObservableObject {
                 let entry = TranscriptionEntry(date: Date(), transcription: finalText)
                 sessionTranscriptions.append(entry)
                 print("✅ Session transcription added (stopRecognition): \(finalText)")
+                // Save to JSON immediately
+                saveAppleHistoryToJSONRealTime()
             } else {
                 print("🚫 Final text already exists in session, not adding duplicate")
             }
@@ -293,20 +345,21 @@ class SpeechRecognizerService: ObservableObject {
             }
         }
         
-        // Add all session transcriptions to the permanent history
+        // Add all session transcriptions to the permanent history (in memory only)
         let initialPermanentCount = permanentHistory.count
         permanentHistory.append(contentsOf: sessionTranscriptions)
         let finalPermanentCount = permanentHistory.count
         
-        print("✅ Saved \(sessionTranscriptions.count) session transcriptions to permanent storage")
+        print("✅ Moved \(sessionTranscriptions.count) session transcriptions to permanent storage (in memory)")
         print("📊 Permanent history: \(initialPermanentCount) → \(finalPermanentCount) entries")
         
-        // Save to JSON file
-        saveAppleHistoryToJSON()
+        // Session JSON file already contains all data via real-time saving
+        // No additional JSON saving needed here
+        print("📄 All data already saved in session JSON via real-time updates")
         
         // Don't clear session transcriptions here - keep them visible in UI
         // They will be cleared when starting a new recording session
-        print("👁️ Session transcriptions saved but kept visible in UI")
+        print("👁️ Session transcriptions moved but kept visible in UI")
     }
     
     // Get current session transcriptions
@@ -366,8 +419,12 @@ class SpeechRecognizerService: ObservableObject {
     
     // Check if the new transcription is significantly different from the previous one
     private func checkAndSaveSignificantChange(newText: String) {
+        print("🔄 checkAndSaveSignificantChange called with newText: '\(newText.prefix(50))...'")
+        
         let trimmedOldText = previousRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNewText = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        print("📝 Comparing: OLD: '\(trimmedOldText.prefix(30))...' vs NEW: '\(trimmedNewText.prefix(30))...'")
 
         let shortTextMaxLength = 10 // Max length for a text to be considered "short"
         let similarityThresholdForShortText = 0.1 // Stricter threshold for short texts
@@ -384,7 +441,7 @@ class SpeechRecognizerService: ObservableObject {
                     effectiveThreshold = similarityThresholdForShortText
                     textCategory = "short"
                 }
-                print("Similarity: \(String(format: "%.2f", similarity)) for old ('\(textCategory)' text): '\(trimmedOldText)' | new: '\(trimmedNewText)'. Effective threshold: \(effectiveThreshold)")
+                print("🔍 Similarity: \(String(format: "%.2f", similarity)) for old ('\(textCategory)' text): '\(trimmedOldText)' | new: '\(trimmedNewText)'. Effective threshold: \(effectiveThreshold)")
 
                 var shouldSaveOldText = false
                 if trimmedOldText.count < shortTextMaxLength {
@@ -397,16 +454,30 @@ class SpeechRecognizerService: ObservableObject {
                     }
                 }
 
+                print("📊 shouldSaveOldText: \(shouldSaveOldText)")
+
                 if shouldSaveOldText {
                     if sessionTranscriptions.last?.transcription != trimmedOldText {
                         let entry = TranscriptionEntry(date: Date(), transcription: trimmedOldText)
                         sessionTranscriptions.append(entry)
-                        print("Session transcription added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
+                        print("➕ Session transcription added (similarity < \(effectiveThreshold)): \(trimmedOldText)")
+                        print("📊 Session transcriptions count now: \(sessionTranscriptions.count)")
+                        // Save to JSON immediately
+                        saveAppleHistoryToJSONRealTime()
+                    } else {
+                        print("🚫 Old text already matches last session entry, not adding duplicate")
                     }
+                } else {
+                    print("🚫 Not saving old text (similarity too high or other criteria not met)")
                 }
+            } else {
+                print("📝 Text similarity detected: one is prefix of another, not saving")
             }
+        } else {
+            print("📝 One of the texts is empty, not comparing")
         }
         previousRecognizedText = newText // Always update to the latest text from the recognizer
+        print("✅ Updated previousRecognizedText to: '\(newText.prefix(50))...'")
     }
     
 
