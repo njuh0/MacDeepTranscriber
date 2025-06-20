@@ -23,18 +23,20 @@ struct ContentView: View {
                     WhisperKitSettingsView(audioCaptureService: audioCaptureService)
                 }
                 
-                if audioCaptureService.selectedSpeechEngines.contains(.appleSpeech) {
-                    AppleSpeechSettingsView(audioCaptureService: audioCaptureService)
+                // Only show transcription output when engines are selected
+                if !audioCaptureService.selectedSpeechEngines.isEmpty {
+                    TranscriptionOutputView(audioCaptureService: audioCaptureService)
                 }
-
-                TranscriptionOutputView(audioCaptureService: audioCaptureService)
 
                 // Conditional rendering for history view
                 if !audioCaptureService.selectedSpeechEngines.isEmpty {
                     TranscriptionHistoryView(audioCaptureService: audioCaptureService, selectedHistoryTab: $selectedHistoryTab)
                 }
 
-                ControlsView(audioCaptureService: audioCaptureService)
+                // Only show controls when engines are selected
+                if !audioCaptureService.selectedSpeechEngines.isEmpty {
+                    ControlsView(audioCaptureService: audioCaptureService)
+                }
 
                 if let error = audioCaptureService.errorMessage {
                     ErrorBannerView(errorMessage: error)

@@ -18,8 +18,10 @@ struct TranscriptionOutputView: View {
                             .stroke(Color.gray, lineWidth: 1)
                     )
             } else {
-                // WhisperKit Output (in its own scrollable container)
-                if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
+                // Horizontal layout for both outputs
+                HStack(spacing: 10) {
+                    // WhisperKit Output (in its own scrollable container)
+                    if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
                     VStack(spacing: 0) {
                         HStack {
                             Text("WhisperKit Output:")
@@ -59,7 +61,7 @@ struct TranscriptionOutputView: View {
                             }
                         }
                     }
-                    .frame(height: audioCaptureService.selectedSpeechEngines.contains(.appleSpeech) ? 120 : 180)
+                    .frame(height: 180)
                     .background(Color(NSColor.textBackgroundColor))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -108,13 +110,14 @@ struct TranscriptionOutputView: View {
                             }
                         }
                     }
-                    .frame(height: audioCaptureService.selectedSpeechEngines.contains(.whisperKit) ? 120 : 180)
+                    .frame(height: 180)
                     .background(Color(NSColor.textBackgroundColor))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.green, lineWidth: 1)
                     )
                 }
+                } // Close HStack
             }
         }
         .padding(.horizontal)

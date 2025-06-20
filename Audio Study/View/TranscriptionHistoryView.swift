@@ -28,20 +28,12 @@ struct TranscriptionHistoryView: View {
     var body: some View {
         if showEngineSelection {
             VStack(alignment: .leading, spacing: 8) {
-                headerView
                 tabSelectorView
                 transcriptionContentView
             }
             .padding(.horizontal)
             .padding(.bottom)
         }
-    }
-    
-    // MARK: - Header View
-    private var headerView: some View {
-        Text("Previous Transcriptions")
-            .font(.headline)
-            .foregroundColor(.cyan)
     }
     
     // MARK: - Tab Selector View
