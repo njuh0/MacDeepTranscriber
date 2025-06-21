@@ -12,7 +12,7 @@ struct MainView: View {
     @StateObject private var audioCaptureService = AudioCaptureService()
     
     var body: some View {
-        NavigationSplitView(columnVisibility: $navigationModel.columnVisibility) {
+        NavigationSplitView {
             SidebarView(navigationModel: navigationModel, audioCaptureService: audioCaptureService)
         } detail: {
             DetailView(navigationModel: navigationModel, audioCaptureService: audioCaptureService)
@@ -26,15 +26,20 @@ struct SidebarView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
     
     var body: some View {
-        List(SidebarItem.allCases, selection: $navigationModel.selectedItem) { item in
+        List(SidebarItem.allCases, selection: Binding(
+            get: { navigationModel.selectedItem },
+            set: { newValue in
+                DispatchQueue.main.async {
+                    navigationModel.selectedItem = newValue
+                }
+            }
+        )) { item in
             NavigationLink(value: item) {
                 HStack {
-                    Image(systemName: item.iconForState(isRecording: audioCaptureService.isCapturing))
+                    Image(systemName: item == .record && audioCaptureService.isCapturing ? 
+                          item.iconForState(isRecording: true) : item.icon)
                         .foregroundColor(item == .record && audioCaptureService.isCapturing ? .red : .primary)
-                        .scaleEffect(item == .record && audioCaptureService.isCapturing ? 1.1 : 1.0)
-                        .opacity(item == .record && audioCaptureService.isCapturing ? 0.8 : 1.0)
-                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), 
-                                 value: audioCaptureService.isCapturing)
+                        .animation(.easeInOut(duration: 0.3), value: audioCaptureService.isCapturing)
                     Text(item.rawValue)
                         .foregroundColor(item == .record && audioCaptureService.isCapturing ? .red : .primary)
                         .animation(.easeInOut(duration: 0.3), value: audioCaptureService.isCapturing)

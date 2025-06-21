@@ -25,7 +25,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .learnWords:
             return "book.circle"
         case .aiChat:
-            return "bubble.left.and.bubble.right.circle"
+            return "bubble.left.and.bubble.right"
         case .settings:
             return "gearshape.circle"
         }
@@ -40,7 +40,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .learnWords:
             return "book.circle"
         case .aiChat:
-            return "bubble.left.and.bubble.right.circle"
+            return "bubble.left.and.bubble.right"
         case .settings:
             return "gearshape.circle"
         }
@@ -48,6 +48,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 }
 
 class NavigationModel: ObservableObject {
-    @Published var selectedItem: SidebarItem? = nil
+    @Published var selectedItem: SidebarItem? = .record
     @Published var columnVisibility: NavigationSplitViewVisibility = .all
 }
