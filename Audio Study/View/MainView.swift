@@ -56,6 +56,8 @@ struct DetailView: View {
                 switch selectedItem {
                 case .record:
                     RecordView(audioCaptureService: audioCaptureService)
+                case .transcriptions:
+                    TranscriptionsView(audioCaptureService: audioCaptureService)
                 case .learnWords:
                     LearnWordsView()
                 case .aiChat:
