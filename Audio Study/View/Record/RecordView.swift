@@ -24,33 +24,18 @@ struct RecordView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                SpeechEngineSelectionView(audioCaptureService: audioCaptureService)
+                // Language Selection
+                LanguageSelectionView(audioCaptureService: audioCaptureService)
                     .padding(.top, 20)
-
-                // Unified Language Selection (shown when any engine is selected)
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    LanguageSelectionView(audioCaptureService: audioCaptureService)
-                }
-
-                // Conditional rendering for settings views
-                if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
-                    WhisperKitSettingsView(audioCaptureService: audioCaptureService)
-                }
                 
-                // Only show transcription output when engines are selected
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    TranscriptionOutputView(audioCaptureService: audioCaptureService)
-                }
+                // Transcription output
+                TranscriptionOutputView(audioCaptureService: audioCaptureService)
 
-                // Conditional rendering for history view
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    TranscriptionHistoryView(audioCaptureService: audioCaptureService, selectedHistoryTab: $selectedHistoryTab)
-                }
+                // History view
+                TranscriptionHistoryView(audioCaptureService: audioCaptureService)
 
-                // Only show controls when engines are selected
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    ControlsView(audioCaptureService: audioCaptureService)
-                }
+                // Controls
+                ControlsView(audioCaptureService: audioCaptureService)
 
                 if let error = audioCaptureService.errorMessage {
                     ErrorBannerView(errorMessage: error)

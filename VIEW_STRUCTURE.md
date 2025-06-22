@@ -22,9 +22,7 @@
 ### ⚙️ Settings/
 Файлы настроек:
 - `SettingsView.swift` - основной экран настроек
-- `LanguageSelectionView.swift` - выбор языка
-- `SpeechEngineSelectionView.swift` - выбор движка распознавания речи
-- `WhisperKitSettingsView.swift` - настройки WhisperKit
+- `LanguageSelectionView.swift` - выбор языка для Apple Speech
 
 ### 🔄 Shared/
 Общие компоненты, используемые в разных экранах:

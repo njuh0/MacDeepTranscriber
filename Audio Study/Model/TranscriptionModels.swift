@@ -1,21 +1,5 @@
 import Foundation
 
-// MARK: - WhisperKit Configuration Models
-
-enum WhisperTaskType: String, CaseIterable {
-    case transcribe = "transcribe"
-    case translate = "translate"
-    
-    var displayName: String {
-        switch self {
-        case .transcribe:
-            return "Transcribe"
-        case .translate:
-            return "Translate to English"
-        }
-    }
-}
-
 // MARK: - Transcription Entry Model
 struct TranscriptionEntry: Codable, Identifiable {
     let id: UUID
@@ -52,12 +36,8 @@ struct RecordingMetadata: Codable {
     let title: String
     let date: Date
     let appleSpeechEnabled: Bool
-    let whisperKitEnabled: Bool
-    let whisperModel: String
-    let language: String
     let appleSpeechLocale: String
     let copiedFiles: [String]
     let appleSpeechTranscriptions: [TranscriptionEntry]
-    let whisperKitTranscriptions: [TranscriptionEntry]
     let totalTranscriptions: Int
 }

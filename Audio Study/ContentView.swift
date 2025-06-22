@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var audioCaptureService = AudioCaptureService()  // Simpler initialization
-    @State private var selectedHistoryTab: Int = 0  // 0 - WhisperKit, 1 - Apple Speech
+    @StateObject private var audioCaptureService = AudioCaptureService()
 
     var body: some View {
         ScrollView {
@@ -11,32 +10,17 @@ struct ContentView: View {
                     .font(.largeTitle)
                     .padding(.top) // Adjusted padding
 
-                SpeechEngineSelectionView(audioCaptureService: audioCaptureService)
-
-                // Unified Language Selection (shown when any engine is selected)
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    LanguageSelectionView(audioCaptureService: audioCaptureService)
-                }
-
-                // Conditional rendering for settings views
-                if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
-                    WhisperKitSettingsView(audioCaptureService: audioCaptureService)
-                }
+                // Language Selection for Apple Speech
+                LanguageSelectionView(audioCaptureService: audioCaptureService)
                 
-                // Only show transcription output when engines are selected
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    TranscriptionOutputView(audioCaptureService: audioCaptureService)
-                }
+                // Transcription output
+                TranscriptionOutputView(audioCaptureService: audioCaptureService)
 
-                // Conditional rendering for history view
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    TranscriptionHistoryView(audioCaptureService: audioCaptureService, selectedHistoryTab: $selectedHistoryTab)
-                }
+                // Apple Speech transcription history
+                TranscriptionHistoryView(audioCaptureService: audioCaptureService)
 
-                // Only show controls when engines are selected
-                if !audioCaptureService.selectedSpeechEngines.isEmpty {
-                    ControlsView(audioCaptureService: audioCaptureService)
-                }
+                // Controls
+                ControlsView(audioCaptureService: audioCaptureService)
 
                 if let error = audioCaptureService.errorMessage {
                     ErrorBannerView(errorMessage: error)

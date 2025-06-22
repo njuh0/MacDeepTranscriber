@@ -12,49 +12,21 @@ class AudioCaptureService: ObservableObject {
     @Published var recognizedText: String = ""
     @Published var isSpeechRecognitionAvailable: Bool = false
     @Published var isMicrophoneAccessGranted: Bool = false
-    @Published var isWhisperKitProcessing: Bool = false
-    @Published var modelLoadingProgress: Double = 0.0
-    @Published var isModelLoaded: Bool = false
-    @Published var selectedWhisperModel: String = "base"
-    @Published var modelLoadingStatus: String = "Ready"
     
-    // Speech engine selection
-    @Published var selectedSpeechEngines: Set<SpeechEngineType> = [.appleSpeech]
+    // Apple Speech text and history
     @Published var appleSpeechText: String = ""
     @Published var appleSpeechHistory: [String] = []
-    
-    // No need for combined persistence service anymore
-    
-    // Old property kept for compatibility during refactoring
-    var useAppleSpeechInParallel: Bool {
-        get { selectedSpeechEngines.contains(.appleSpeech) }
-        set {
-            if newValue {
-                selectedSpeechEngines.insert(.appleSpeech)
-            } else {
-                selectedSpeechEngines.remove(.appleSpeech)
-            }
-        }
-    }
-    
-    // WhisperKit Configuration
-    @Published var whisperTranscriptionInterval: TimeInterval = 15.0
-    @Published var whisperMaxBufferDuration: TimeInterval = 120.0
-    @Published var whisperSelectedLanguage: String = "en" // ISO 639-1 код для WhisperKit
-    @Published var whisperTaskType: WhisperTaskType = .transcribe // transcribe или translate
     
     // Apple Speech Configuration
     @Published var selectedLocale: Locale = Locale(identifier: "en-US")
 
     private var audioEngine: AVAudioEngine?
-    let whisperKitService: WhisperKitService
     // Expose the service so ContentView can access locale info
     let speechRecognizerService: SpeechRecognizerService
     private var cancellables = Set<AnyCancellable>()
 
     init() {
         // Initialize services
-        whisperKitService = WhisperKitService()
         speechRecognizerService = SpeechRecognizerService()
         
         // Request microphone access early
@@ -73,58 +45,22 @@ class AudioCaptureService: ObservableObject {
         // Set up callbacks after all properties are initialized
         setupCallbacks()
         
-        // Individual services load their own histories automatically
-        print("ℹ️ AudioCaptureService initialized - individual engines manage their own JSON files")
+        print("ℹ️ AudioCaptureService initialized with Apple Speech only")
     }
     
     private func setupCallbacks() {
-        setupWhisperKitCallbacks()
-        
-        // Set initial availability based on WhisperKit
+        // Set initial availability
         updateAvailability()
         
-        // Subscribe to WhisperKit processing state
-        whisperKitService.$isProcessing
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isWhisperKitProcessing)
-            
-        whisperKitService.$modelLoadingProgress
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$modelLoadingProgress)
-            
-        whisperKitService.$isModelLoaded
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isModelLoaded)
-            
-        whisperKitService.$modelLoadingStatus
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$modelLoadingStatus)
-            
         // Set up Apple Speech callbacks
         speechRecognizerService.$recognizedText
             .receive(on: DispatchQueue.main)
             .sink { [weak self] text in
-                // Always store in appleSpeechText
+                // Store in appleSpeechText and main recognizedText
                 self?.appleSpeechText = text
+                self?.recognizedText = text
             }
             .store(in: &cancellables)
-            
-        // Subscribe to WhisperKit transcription history (permanent storage)
-        // whisperKitService.$transcriptionList
-        //     .receive(on: DispatchQueue.main)
-        //     .sink { [weak self] (permanentHistory: [TranscriptionEntry]) in
-        //         self?.updateWhisperKitDisplayList()
-        //     }
-        //     .store(in: &cancellables)
-            
-        // Subscribe to WhisperKit session transcriptions (temporary during recording)
-        // whisperKitService.$sessionTranscriptions
-        //     .receive(on: DispatchQueue.main)
-        //     .sink { [weak self] (sessionHistory: [TranscriptionEntry]) in
-        //         // WhisperKit updates are handled automatically via @Published
-        //         // No additional processing needed
-        //     }
-        //     .store(in: &cancellables)
             
         speechRecognizerService.$sessionTranscriptions // Apple Speech session history
             .receive(on: DispatchQueue.main)
@@ -137,138 +73,34 @@ class AudioCaptureService: ObservableObject {
             .receive(on: DispatchQueue.main)
             .compactMap { $0 }
             .sink { [weak self] error in
-                if self?.useAppleSpeechInParallel == true {
-                    // Only show Apple Speech errors if we're using it
-                    self?.errorMessage = "Apple Speech: \(error)"
-                }
+                self?.errorMessage = "Apple Speech: \(error)"
             }
             .store(in: &cancellables)
             
-        // Sync initial model selection and configuration
+        // Initialize display lists  
         Task { @MainActor [self] in
-            if selectedWhisperModel != "base" {
-                switchWhisperModel(to: selectedWhisperModel)
-            }
-            // Sync initial configuration values
-            updateWhisperTranscriptionInterval(whisperTranscriptionInterval)
-            updateWhisperMaxBufferDuration(whisperMaxBufferDuration)
-            updateWhisperLanguage(whisperSelectedLanguage)
-            updateWhisperTaskType(whisperTaskType)
-            
-            // Initialize display lists  
             updateAppleSpeechDisplayList()
         }
     }
     
-    private func setupWhisperKitCallbacks() {
-        whisperKitService.onError = { [weak self] error in
-            DispatchQueue.main.async {
-                    self?.errorMessage = error.localizedDescription
-                    print("WhisperKitService Error: \(error.localizedDescription)")
-                
-            }
-        }
-        whisperKitService.onAvailabilityChange = { [weak self] available in
-            DispatchQueue.main.async {
-                    self?.isSpeechRecognitionAvailable = available
-                    print("WhisperKit availability changed: \(available)")
-                
-            }
-        }
-        whisperKitService.onRecognitionResult = { [weak self] text in
-            DispatchQueue.main.async {
-                    self?.recognizedText = text
-                
-            }
-        }
-    }
-    
-    // We no longer need this method since we're using WhisperKit as the primary engine
-    // and Apple Speech is only used in parallel when enabled
-    
+    // Update availability based on Apple Speech
     private func updateAvailability() {
-        // Since WhisperKit is our primary engine now
-        isSpeechRecognitionAvailable = whisperKitService.isAvailable
+        isSpeechRecognitionAvailable = speechRecognizerService.isAvailable
     }
     
-    // Method to update selected speech engines
-    func updateSelectedSpeechEngines(_ engines: Set<SpeechEngineType>) {
-        let previousEngines = selectedSpeechEngines
-        selectedSpeechEngines = engines
-        
-        // Handle Apple Speech changes if we're already capturing
-        if isCapturing {
-            let wasAppleSpeechEnabled = previousEngines.contains(.appleSpeech)
-            let isAppleSpeechEnabled = engines.contains(.appleSpeech)
-            
-            // Start Apple Speech if newly enabled
-            if !wasAppleSpeechEnabled && isAppleSpeechEnabled {
-                startAppleSpeech()
-            }
-            // Stop Apple Speech if newly disabled
-            else if wasAppleSpeechEnabled && !isAppleSpeechEnabled {
-                stopAppleSpeech()
-            }
-        }
-    }
-    
-    // For backward compatibility
-    func toggleAppleSpeechParallel(_ enabled: Bool) {
-        var engines = selectedSpeechEngines
-        if enabled {
-            engines.insert(.appleSpeech)
-        } else {
-            engines.remove(.appleSpeech)
-        }
-        updateSelectedSpeechEngines(engines)
-    }
-    
+    // Apple Speech is always available and enabled
+    var isAppleSpeechEnabled: Bool { true }
 
-    func switchWhisperModel(to modelName: String) {
-        guard !isCapturing else {
-            errorMessage = "Cannot switch models while capturing. Stop capture first."
-            return
-        }
-        
-        selectedWhisperModel = modelName
-        whisperKitService.switchModel(to: modelName)
-        statusMessage = "Switching to \(modelName) model..."
-    }
-    
-    func updateWhisperTranscriptionInterval(_ interval: TimeInterval) {
-        guard !isCapturing else {
-            errorMessage = "Cannot change settings while capturing. Stop capture first."
-            return
-        }
-        
-        whisperTranscriptionInterval = interval
-        whisperKitService.updateTranscriptionInterval(interval)
-        statusMessage = "Updated transcription interval to \(String(format: "%.1f", interval)) seconds."
-    }
-    
-    func updateWhisperMaxBufferDuration(_ duration: TimeInterval) {
-        guard !isCapturing else {
-            errorMessage = "Cannot change settings while capturing. Stop capture first."
-            return
-        }
-        
-        whisperMaxBufferDuration = duration
-        whisperKitService.updateMaxBufferDuration(duration)
-        statusMessage = "Updated max buffer duration to \(String(format: "%.0f", duration)) seconds."
-    }
-    
     func clearRecognizedText() {
         recognizedText = ""
         appleSpeechText = ""
         statusMessage = "Transcription text cleared."
         
-        // Опционально очищаем также историю Apple Speech
-        if useAppleSpeechInParallel {
-            speechRecognizerService.clearRecognizedText(clearHistory: false)
-        }
+        // Clear Apple Speech text
+        speechRecognizerService.clearRecognizedText(clearHistory: false)
     }
     
-    // Метод для очистки истории Apple Speech
+    // Method to clear Apple Speech history
     func clearAppleSpeechHistory() {
         speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
@@ -280,15 +112,13 @@ class AudioCaptureService: ObservableObject {
     
     // Method to clear transcription history
     func clearTranscriptionHistory() {
-        // Clear individual engine histories - they handle their own JSON files
-        whisperKitService.clearSession()
+        // Clear Apple Speech history - it handles its own JSON files
         speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
     
     
     func clearTranscriptionList() {
-        // Clear individual engine histories - they handle their own JSON files  
-        whisperKitService.clearSession()
+        // Clear Apple Speech history - it handles its own JSON files  
         speechRecognizerService.clearRecognizedText(clearHistory: true, clearSession: true)
     }
 
@@ -300,27 +130,15 @@ class AudioCaptureService: ObservableObject {
         }
 
         do {
-            // Verify at least one engine is selected
-            if selectedSpeechEngines.isEmpty {
-                throw AppError.noSpeechEngineSelected
-            }
-            
             // Start a new session (clears previous session data)
             startNewSession()
             
-            // Configure audio engine for all engines to use
+            // Configure audio engine
             try configureAudioEngine()
-            let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
             
-            // Start selected engines
-            if selectedSpeechEngines.contains(.whisperKit) {
-                try whisperKitService.startRecognition(audioFormat: recordingFormat)
-                statusMessage = "WhisperKit active. Processing..."
-            }
-            
-            if selectedSpeechEngines.contains(.appleSpeech) {
-                try startAppleSpeechCapture()
-            }
+            // Start Apple Speech
+            try startAppleSpeechCapture()
+            statusMessage = "Apple Speech active. Processing..."
             
             isCapturing = true
         } catch {
@@ -338,14 +156,9 @@ class AudioCaptureService: ObservableObject {
                     statusMessage = "⚠️ Microphone access denied"
                 case .coreAudioError(let code, _):
                     statusMessage = "⚠️ CoreAudio error (\(code)). Try restarting your app"
-                case .noSpeechEngineSelected:
-                    statusMessage = "⚠️ Please select at least one speech engine"
                 default:
                     statusMessage = "⚠️ Failed to start audio capture"
                 }
-            } else if let whisperError = error as? WhisperKitError {
-                errorMessage = whisperError.localizedDescription
-                statusMessage = "⚠️ WhisperKit error"
             } else {
                 errorMessage = error.localizedDescription
                 statusMessage = "⚠️ Failed to start audio capture"
@@ -360,18 +173,10 @@ class AudioCaptureService: ObservableObject {
 
         print("🛑 AudioCaptureService: Starting stopCapture process...")
         
-        // Stop active engines first to ensure final transcriptions are captured
-        if selectedSpeechEngines.contains(.whisperKit) {
-            print("🛑 Stopping WhisperKit recognition...")
-            whisperKitService.stopRecognition()
-            print("✅ WhisperKit stopped. Session count: \(whisperKitService.sessionTranscriptions.count)")
-        }
-        
-        if selectedSpeechEngines.contains(.appleSpeech) {
-            print("🛑 Stopping Apple Speech recognition...")
-            speechRecognizerService.stopRecognition()
-            print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
-        }
+        // Stop Apple Speech recognition
+        print("🛑 Stopping Apple Speech recognition...")
+        speechRecognizerService.stopRecognition()
+        print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
 
         // Small delay to ensure any final async operations complete
         Task {
@@ -407,18 +212,10 @@ class AudioCaptureService: ObservableObject {
 
         print("🛑 AudioCaptureService: Starting stopCaptureWithCompletion process...")
         
-        // Stop active engines first to ensure final transcriptions are captured
-        if selectedSpeechEngines.contains(.whisperKit) {
-            print("🛑 Stopping WhisperKit recognition...")
-            whisperKitService.stopRecognition()
-            print("✅ WhisperKit stopped. Session count: \(whisperKitService.sessionTranscriptions.count)")
-        }
-        
-        if selectedSpeechEngines.contains(.appleSpeech) {
-            print("🛑 Stopping Apple Speech recognition...")
-            speechRecognizerService.stopRecognition()
-            print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
-        }
+        // Stop Apple Speech recognition
+        print("🛑 Stopping Apple Speech recognition...")
+        speechRecognizerService.stopRecognition()
+        print("✅ Apple Speech stopped. Session count: \(speechRecognizerService.sessionTranscriptions.count)")
 
         // Ensure all async operations complete before calling completion
         Task {
@@ -455,9 +252,7 @@ class AudioCaptureService: ObservableObject {
                 try await speechRecognizerService.startRecognition()
             } catch {
                 print("Error starting Apple Speech: \(error.localizedDescription)")
-                if useAppleSpeechInParallel {
-                    errorMessage = "Apple Speech error: \(error.localizedDescription)"
-                }
+                errorMessage = "Apple Speech error: \(error.localizedDescription)"
             }
         }
     }
@@ -467,16 +262,6 @@ class AudioCaptureService: ObservableObject {
     }
     
     // MARK: - Speech Engine Specific Methods
-    
-    private func startWhisperKitCapture() throws {
-        try configureAudioEngine()
-        
-        let recordingFormat = audioEngine!.inputNode.outputFormat(forBus: 0)
-        
-        // Start recognition with WhisperKit
-        try whisperKitService.startRecognition(audioFormat: recordingFormat)
-        statusMessage = "Audio capture active with WhisperKit. Processing..."
-    }
     
     private func startAppleSpeechCapture() throws {
         // Start Apple Speech recognition using Task to handle async
@@ -516,24 +301,13 @@ class AudioCaptureService: ObservableObject {
             print("Recording format obtained: Channels=\(recordingFormat.channelCount), SampleRate=\(recordingFormat.sampleRate)")
         }
 
-        // Install a tap on the input node and pass buffers to the selected engine
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, time in
-            guard let self = self else { return }
-            
-            // Process buffer with WhisperKit
-            Task { @MainActor in
-                self.whisperKitService.appendAudioBuffer(buffer)
-            }
-        }
-        print("InputNode tap installed on bus 0.")
-
         print("Preparing AVAudioEngine...")
         engine.prepare()
         print("AVAudioEngine prepared.")
         
         do {
             print("Starting AVAudioEngine...")
-            try engine.safeStart() // Use our custom safe start method
+            try engine.start()
             print("AVAudioEngine started successfully.")
         } catch {
             let nsError = error as NSError
@@ -577,147 +351,6 @@ class AudioCaptureService: ObservableObject {
         }
         selectedLocale = locale
         speechRecognizerService.changeLocale(to: locale)
-        
-        // Синхронизация языка с WhisperKit
-        syncLanguageToWhisperKit(from: locale)
-    }
-    
-    // Синхронизация языка между Apple Speech и WhisperKit
-    private func syncLanguageToWhisperKit(from locale: Locale) {
-        let whisperLanguage = appleLocaleToWhisperLanguage(locale)
-        if whisperSelectedLanguage != whisperLanguage {
-            whisperSelectedLanguage = whisperLanguage
-            whisperKitService.updateLanguage(whisperLanguage)
-        }
-    }
-    
-    private func syncLanguageToAppleSpeech(from whisperLanguage: String) {
-        let appleLocale = whisperLanguageToAppleLocale(whisperLanguage)
-        if selectedLocale.identifier != appleLocale.identifier {
-            selectedLocale = appleLocale
-            speechRecognizerService.changeLocale(to: appleLocale)
-        }
-    }
-    
-    // Метод для обновления языка WhisperKit
-    func updateWhisperLanguage(_ language: String) {
-        whisperSelectedLanguage = language
-        whisperKitService.updateLanguage(language)
-        
-        // Синхронизируем с Apple Speech
-        syncLanguageToAppleSpeech(from: language)
-    }
-    
-    // Метод для обновления типа задачи WhisperKit
-    func updateWhisperTaskType(_ taskType: WhisperTaskType) {
-        whisperTaskType = taskType
-        whisperKitService.updateTaskType(taskType)
-    }
-    
-    // Поддерживаемые языки для WhisperKit (ISO 639-1)
-    func getSupportedWhisperLanguages() -> [(String, String)] {
-        return [
-            ("en", "English"),
-            ("ru", "Русский"),
-            ("es", "Español"),
-            ("fr", "Français"),
-            ("de", "Deutsch"),
-            ("it", "Italiano"),
-            ("pt", "Português"),
-            ("zh", "中文"),
-            ("ja", "日本語"),
-            ("ko", "한국어"),
-            ("ar", "العربية"),
-            ("hi", "हिन्दी"),
-            ("tr", "Türkçe"),
-            ("pl", "Polski"),
-            ("nl", "Nederlands"),
-            ("sv", "Svenska"),
-            ("da", "Dansk"),
-            ("no", "Norsk"),
-            ("fi", "Suomi"),
-            ("uk", "Українська"),
-            ("cs", "Čeština"),
-            ("sk", "Slovenčina"),
-            ("hu", "Magyar"),
-            ("ro", "Română"),
-            ("bg", "Български"),
-            ("hr", "Hrvatski"),
-            ("sr", "Српски"),
-            ("sl", "Slovenščina"),
-            ("et", "Eesti"),
-            ("lv", "Latviešu"),
-            ("lt", "Lietuvių"),
-            ("mt", "Malti"),
-            ("ga", "Gaeilge"),
-            ("cy", "Cymraeg"),
-            ("is", "Íslenska"),
-            ("mk", "Македонски"),
-            ("sq", "Shqip"),
-            ("eu", "Euskera"),
-            ("ca", "Català"),
-            ("gl", "Galego")
-        ]
-    }
-    
-    // Конвертация локали Apple Speech в язык WhisperKit
-    private func appleLocaleToWhisperLanguage(_ locale: Locale) -> String {
-        let languageCode = locale.language.languageCode?.identifier ?? "en"
-        // Маппинг основных языков
-        switch languageCode {
-        case "zh": 
-            // Для китайского определяем упрощенный или традиционный
-            if locale.identifier.contains("CN") || locale.identifier.contains("Hans") {
-                return "zh"
-            } else {
-                return "zh" // WhisperKit использует "zh" для китайского
-            }
-        default:
-            return languageCode
-        }
-    }
-    
-    // Конвертация языка WhisperKit в локаль Apple Speech
-    private func whisperLanguageToAppleLocale(_ language: String) -> Locale {
-        // Маппинг основных языков обратно в локали Apple
-        switch language {
-        case "en": return Locale(identifier: "en-US")
-        case "ru": return Locale(identifier: "ru-RU")
-        case "es": return Locale(identifier: "es-ES")
-        case "fr": return Locale(identifier: "fr-FR")
-        case "de": return Locale(identifier: "de-DE")
-        case "it": return Locale(identifier: "it-IT")
-        case "pt": return Locale(identifier: "pt-BR")
-        case "zh": return Locale(identifier: "zh-CN")
-        case "ja": return Locale(identifier: "ja-JP")
-        case "ko": return Locale(identifier: "ko-KR")
-        case "ar": return Locale(identifier: "ar-SA")
-        case "hi": return Locale(identifier: "hi-IN")
-        case "tr": return Locale(identifier: "tr-TR")
-        case "pl": return Locale(identifier: "pl-PL")
-        case "nl": return Locale(identifier: "nl-NL")
-        case "sv": return Locale(identifier: "sv-SE")
-        case "da": return Locale(identifier: "da-DK")
-        case "no": return Locale(identifier: "no-NO")
-        case "fi": return Locale(identifier: "fi-FI")
-        case "uk": return Locale(identifier: "uk-UA")
-        case "cs": return Locale(identifier: "cs-CZ")
-        case "sk": return Locale(identifier: "sk-SK")
-        case "hu": return Locale(identifier: "hu-HU")
-        case "ro": return Locale(identifier: "ro-RO")
-        case "bg": return Locale(identifier: "bg-BG")
-        case "hr": return Locale(identifier: "hr-HR")
-        case "sr": return Locale(identifier: "sr-RS")
-        case "sl": return Locale(identifier: "sl-SI")
-        case "et": return Locale(identifier: "et-EE")
-        case "lv": return Locale(identifier: "lv-LV")
-        case "lt": return Locale(identifier: "lt-LT")
-        case "mt": return Locale(identifier: "mt-MT")
-        case "ga": return Locale(identifier: "ga-IE")
-        case "cy": return Locale(identifier: "cy-GB")
-        case "is": return Locale(identifier: "is-IS")
-        default: return Locale(identifier: "en-US")
-        }
     }
     
     // MARK: - Session Management
@@ -725,19 +358,10 @@ class AudioCaptureService: ObservableObject {
     func saveSessionToPermanentStorage() {
         print("💾 AudioCaptureService: Starting saveSessionToPermanentStorage...")
         
-        // Save WhisperKit session transcriptions
-        if selectedSpeechEngines.contains(.whisperKit) {
-            let sessionCount = whisperKitService.sessionTranscriptions.count
-            print("💾 Saving \(sessionCount) WhisperKit session transcriptions...")
-            whisperKitService.saveSessionToPermanentStorage()
-        }
-        
         // Save Apple Speech session transcriptions
-        if selectedSpeechEngines.contains(.appleSpeech) {
-            let sessionCount = speechRecognizerService.sessionTranscriptions.count
-            print("💾 Saving \(sessionCount) Apple Speech session transcriptions...")
-            speechRecognizerService.saveSessionTranscriptionsToPermanentStorage()
-        }
+        let sessionCount = speechRecognizerService.sessionTranscriptions.count
+        print("💾 Saving \(sessionCount) Apple Speech session transcriptions...")
+        speechRecognizerService.saveSessionTranscriptionsToPermanentStorage()
         
         // Update the display lists (individual services save their own JSON)
         updateDisplay()
@@ -752,15 +376,8 @@ class AudioCaptureService: ObservableObject {
     }
     
     func startNewSession() {
-        // Clear session data for WhisperKit
-        if selectedSpeechEngines.contains(.whisperKit) {
-            whisperKitService.clearSession()
-        }
-        
         // Clear session data for Apple Speech
-        if selectedSpeechEngines.contains(.appleSpeech) {
-            speechRecognizerService.startNewRecordingSession()
-        }
+        speechRecognizerService.startNewRecordingSession()
         
         // Clear current text
         recognizedText = ""
@@ -795,64 +412,37 @@ class AudioCaptureService: ObservableObject {
             return
         }
         
-        // Copy JSON files for active engines only
+        // Copy JSON files for Apple Speech
         var copiedFiles: [String] = []
         
-        // Read Apple Speech session transcriptions if it was selected
+        // Read Apple Speech session transcriptions
         var appleSpeechTranscriptions: [TranscriptionEntry] = []
-        if selectedSpeechEngines.contains(.appleSpeech) {
-            let appleSpeechSourceURL = documentsDirectory.appendingPathComponent("apple_history_session.json")
-            
-            if FileManager.default.fileExists(atPath: appleSpeechSourceURL.path) {
-                do {
-                    let data = try Data(contentsOf: appleSpeechSourceURL)
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    appleSpeechTranscriptions = try decoder.decode([TranscriptionEntry].self, from: data)
-                    copiedFiles.append("Apple Speech transcriptions")
-                    print("✅ Loaded Apple Speech session transcriptions: \(appleSpeechTranscriptions.count) entries")
-                } catch {
-                    print("❌ Error reading Apple Speech session JSON: \(error.localizedDescription)")
-                }
-            } else {
-                print("⚠️ Apple Speech session JSON file not found at: \(appleSpeechSourceURL.path)")
+        let appleSpeechSourceURL = documentsDirectory.appendingPathComponent("apple_history_session.json")
+        
+        if FileManager.default.fileExists(atPath: appleSpeechSourceURL.path) {
+            do {
+                let data = try Data(contentsOf: appleSpeechSourceURL)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                appleSpeechTranscriptions = try decoder.decode([TranscriptionEntry].self, from: data)
+                copiedFiles.append("Apple Speech transcriptions")
+                print("✅ Loaded Apple Speech session transcriptions: \(appleSpeechTranscriptions.count) entries")
+            } catch {
+                print("❌ Error reading Apple Speech session JSON: \(error.localizedDescription)")
             }
+        } else {
+            print("⚠️ Apple Speech session JSON file not found at: \(appleSpeechSourceURL.path)")
         }
         
-        // Read WhisperKit session transcriptions if it was selected
-        var whisperKitTranscriptions: [TranscriptionEntry] = []
-        if selectedSpeechEngines.contains(.whisperKit) {
-            let whisperKitSourceURL = documentsDirectory.appendingPathComponent("whisper_history_session.json")
-            
-            if FileManager.default.fileExists(atPath: whisperKitSourceURL.path) {
-                do {
-                    let data = try Data(contentsOf: whisperKitSourceURL)
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    whisperKitTranscriptions = try decoder.decode([TranscriptionEntry].self, from: data)
-                    copiedFiles.append("WhisperKit transcriptions")
-                    print("✅ Loaded WhisperKit session transcriptions: \(whisperKitTranscriptions.count) entries")
-                } catch {
-                    print("❌ Error reading WhisperKit session JSON: \(error.localizedDescription)")
-                }
-            } else {
-                print("⚠️ WhisperKit session JSON file not found at: \(whisperKitSourceURL.path)")
-            }
-        }
-        
-        // Create comprehensive recording data with all transcriptions and metadata
-        let totalTranscriptions = appleSpeechTranscriptions.count + whisperKitTranscriptions.count
+        // Create recording data with Apple Speech transcriptions only
+        let totalTranscriptions = appleSpeechTranscriptions.count
         let recordingData = RecordingMetadata(
             title: title,
             date: Date(),
-            appleSpeechEnabled: selectedSpeechEngines.contains(.appleSpeech),
-            whisperKitEnabled: selectedSpeechEngines.contains(.whisperKit),
-            whisperModel: selectedWhisperModel,
-            language: whisperSelectedLanguage,
+            appleSpeechEnabled: true,
             appleSpeechLocale: selectedLocale.identifier,
             copiedFiles: copiedFiles,
             appleSpeechTranscriptions: appleSpeechTranscriptions,
-            whisperKitTranscriptions: whisperKitTranscriptions,
             totalTranscriptions: totalTranscriptions
         )
         
@@ -864,16 +454,15 @@ class AudioCaptureService: ObservableObject {
         do {
             let data = try encoder.encode(recordingData)
             try data.write(to: recordingDataURL)
-            print("✅ Saved comprehensive recording data to: \(recordingDataURL.path)")
+            print("✅ Saved recording data to: \(recordingDataURL.path)")
             print("📊 Total transcriptions saved: \(totalTranscriptions)")
             print("📝 Apple Speech entries: \(appleSpeechTranscriptions.count)")
-            print("📝 WhisperKit entries: \(whisperKitTranscriptions.count)")
         } catch {
-            print("❌ Error saving comprehensive recording data: \(error.localizedDescription)")
+            print("❌ Error saving recording data: \(error.localizedDescription)")
         }
         
         // Update status message
-        let totalCount = appleSpeechTranscriptions.count + whisperKitTranscriptions.count
+        let totalCount = appleSpeechTranscriptions.count
         statusMessage = "Recording '\(title)' saved with \(totalCount) transcription(s)"
         print("✅ Recording saved successfully: \(title) with \(totalCount) total transcriptions")
     }

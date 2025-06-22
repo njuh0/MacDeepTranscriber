@@ -213,8 +213,6 @@ struct TranscriptionsView: View {
                             switch engine {
                             case "Apple Speech":
                                 keyToRemove = "appleSpeechTranscriptions"
-                            case "WhisperKit":
-                                keyToRemove = "whisperKitTranscriptions"
                             case "AI Enhanced":
                                 keyToRemove = "aiEnhancedTranscription"
                             default:
@@ -266,8 +264,8 @@ struct TranscriptionsView: View {
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            // Проверяем, есть ли транскрипции любого из движков
-                            return json["appleSpeechTranscriptions"] != nil || json["whisperKitTranscriptions"] != nil
+                            // Check if there are any transcriptions remaining (only Apple Speech now)
+                            return json["appleSpeechTranscriptions"] != nil
                         }
                     } catch {
                         print("Error checking file \(file): \(error)")
@@ -333,7 +331,7 @@ struct TranscriptionsView: View {
                         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                             print("JSON structure keys: \(json.keys)")
                             
-                            // Парсим Apple Speech транскрипции
+                            // Parse Apple Speech transcriptions
                             if let appleSpeechTranscriptions = json["appleSpeechTranscriptions"] as? [[String: Any]] {
                                 let transcriptions = appleSpeechTranscriptions.compactMap { item in
                                     item["transcription"] as? String
@@ -345,19 +343,7 @@ struct TranscriptionsView: View {
                                 }
                             }
                             
-                            // Парсим WhisperKit транскрипции
-                            if let whisperKitTranscriptions = json["whisperKitTranscriptions"] as? [[String: Any]] {
-                                let transcriptions = whisperKitTranscriptions.compactMap { item in
-                                    item["transcription"] as? String
-                                }.joined(separator: "\n\n")
-                                
-                                if !transcriptions.isEmpty {
-                                    newTranscriptions["WhisperKit"] = transcriptions
-                                    print("Added WhisperKit transcriptions: \(whisperKitTranscriptions.count) items")
-                                }
-                            }
-                            
-                            // Парсим AI Enhanced транскрипцию
+                            // Parse AI Enhanced transcription
                             if let aiEnhancedTranscription = json["aiEnhancedTranscription"] as? String {
                                 if !aiEnhancedTranscription.isEmpty {
                                     newTranscriptions["AI Enhanced"] = aiEnhancedTranscription
@@ -584,11 +570,11 @@ struct TranscriptionContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 20) {
-                    // Основные транскрипции (Apple Speech и WhisperKit) бок о бок
+                    // Main transcriptions (Apple Speech only)
                     let originalTranscriptions = transcriptions.filter { $0.key != "AI Enhanced" }
                     
                     if originalTranscriptions.count == 1 {
-                        // Одна оригинальная транскрипция
+                        // One original transcription (Apple Speech)
                         let (engine, transcription) = originalTranscriptions.first!
                         SingleTranscriptionView(
                             engine: engine, 
@@ -596,7 +582,7 @@ struct TranscriptionContentView: View {
                             onDelete: { onDeleteTranscription(engine) }
                         )
                     } else if originalTranscriptions.count > 1 {
-                        // Несколько оригинальных транскрипций бок о бок
+                        // Multiple original transcriptions (if extended in future)
                         HStack(spacing: 20) {
                             ForEach(originalTranscriptions.sorted(by: { $0.key < $1.key }), id: \.key) { engine, transcription in
                                 SingleTranscriptionView(
@@ -609,7 +595,7 @@ struct TranscriptionContentView: View {
                         }
                     }
                     
-                    // AI Enhanced транскрипция под основными
+                    // AI Enhanced transcription below the main ones
                     if let aiEnhanced = transcriptions["AI Enhanced"] {
                         VStack(spacing: 12) {
                             HStack {

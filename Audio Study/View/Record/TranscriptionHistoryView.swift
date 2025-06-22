@@ -2,177 +2,54 @@ import SwiftUI
 
 struct TranscriptionHistoryView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
-    @Binding var selectedHistoryTab: Int
-    
-    // Computed properties to break down complex logic
-    private var hasWhisperKit: Bool {
-        audioCaptureService.selectedSpeechEngines.contains(.whisperKit)
-    }
-    
-    private var hasAppleSpeech: Bool {
-        audioCaptureService.selectedSpeechEngines.contains(.appleSpeech)
-    }
-    
-    private var hasBothEngines: Bool {
-        hasWhisperKit && hasAppleSpeech
-    }
-    
-    private var showEngineSelection: Bool {
-        !audioCaptureService.selectedSpeechEngines.isEmpty
-    }
-    
-    private var borderColor: Color {
-        selectedHistoryTab == 0 ? .cyan : .green
-    }
 
     var body: some View {
-        if showEngineSelection {
-            VStack(alignment: .leading, spacing: 8) {
-                tabSelectorView
-                transcriptionContentView
+        VStack(alignment: .leading, spacing: 8) {
+            // Header for Apple Speech History
+            HStack {
+                Text("Apple Speech History")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button("Clear History") {
+                    audioCaptureService.clearAppleSpeechHistory()
+                }
+                .foregroundColor(.red)
+                .disabled(audioCaptureService.appleSpeechHistory.isEmpty)
             }
             .padding(.horizontal)
-            .padding(.bottom)
-        }
-    }
-    
-    // MARK: - Tab Selector View
-    @ViewBuilder
-    private var tabSelectorView: some View {
-        if hasBothEngines {
-            VStack(spacing: 4) {
-                enginePicker
-                tabHeaderText
-            }
-        } else {
-            singleEngineHeader
-        }
-    }
-    
-    private var enginePicker: some View {
-        Picker("Transcription History", selection: $selectedHistoryTab) {
-            Text("WhisperKit History").tag(0)
-            Text("Apple Speech History").tag(1)
-        }
-        .pickerStyle(SegmentedPickerStyle())
-        .padding(.horizontal)
-        .padding(.bottom, 4)
-    }
-    
-    private var tabHeaderText: some View {
-        HStack {
-            Text(selectedHistoryTab == 0 ? "WhisperKit Segments:" : "Apple Speech History:")
-                .font(.subheadline)
-                .foregroundColor(selectedHistoryTab == 0 ? .blue : .green)
-            Spacer()
+            
+            // Apple Speech transcription content
+            appleSpeechContentView
         }
         .padding(.horizontal)
+        .padding(.bottom)
     }
     
+    // MARK: - Apple Speech Content View
     @ViewBuilder
-    private var singleEngineHeader: some View {
-        HStack {
-            if hasWhisperKit {
-                Text("WhisperKit Segments:")
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
-            } else if hasAppleSpeech {
-                Text("Apple Speech History:")
-                    .font(.subheadline)
-                    .foregroundColor(.green)
-            } else {
-                Text("No speech engine selected")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+    private var appleSpeechContentView: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 4) {
+                AppleSpeechTranscriptionListView(
+                    transcriptions: audioCaptureService.appleSpeechHistory,
+                    emptyMessage: "No Apple Speech transcriptions yet. Start recording to see results."
+                )
             }
-            Spacer()
         }
+        .frame(maxHeight: 150)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.green, lineWidth: 2)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.green.opacity(0.1)))
+        )
         .padding(.horizontal)
-    }
-    
-    // MARK: - Transcription Content View
-    private var transcriptionContentView: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 4) {
-                transcriptionListContent
-            }
-        }
-        .frame(maxHeight: 200)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: 1)
-        )
-    }
-    
-    @ViewBuilder
-    private var transcriptionListContent: some View {
-        if hasBothEngines {
-            dualEngineContent
-        } else if hasWhisperKit {
-            whisperKitOnlyContent
-        } else if hasAppleSpeech {
-            appleSpeechOnlyContent
-        } else {
-            noEngineSelectedContent
-        }
-    }
-    
-    // MARK: - Content Views for Different Engine Configurations
-    @ViewBuilder
-    private var dualEngineContent: some View {
-        if selectedHistoryTab == 0 {
-            WhisperKitTranscriptionListView(
-                transcriptions: audioCaptureService.whisperKitService.sessionTranscriptions,
-                emptyMessage: "No WhisperKit transcriptions yet."
-            )
-        } else {
-            AppleSpeechTranscriptionListView(
-                transcriptions: audioCaptureService.appleSpeechHistory,
-                emptyMessage: "No Apple Speech history yet."
-            )
-        }
-    }
-    
-    private var whisperKitOnlyContent: some View {
-        WhisperKitTranscriptionListView(
-            transcriptions: audioCaptureService.whisperKitService.sessionTranscriptions,
-            emptyMessage: "No WhisperKit transcriptions yet."
-        )
-    }
-    
-    private var appleSpeechOnlyContent: some View {
-        AppleSpeechTranscriptionListView(
-            transcriptions: audioCaptureService.appleSpeechHistory,
-            emptyMessage: "No Apple Speech history yet."
-        )
-    }
-    
-    private var noEngineSelectedContent: some View {
-        Text("Select a speech engine to see transcription history.")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .padding(8)
     }
 }
 
-// MARK: - Supporting Views
-struct WhisperKitTranscriptionListView: View {
-    let transcriptions: [TranscriptionEntry]
-    let emptyMessage: String
-    
-    var body: some View {
-        if transcriptions.isEmpty {
-            Text(emptyMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(8)
-        } else {
-            ForEach(transcriptions.reversed()) { entry in
-                TranscriptionItemView(text: entry.transcription)
-            }
-        }
-    }
-}
+// MARK: - Helper Views
 
 struct AppleSpeechTranscriptionListView: View {
     let transcriptions: [String]

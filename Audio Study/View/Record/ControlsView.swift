@@ -9,27 +9,17 @@ struct ControlsView: View {
 
     var body: some View {
         VStack {
-            // Clear text and history buttons
-            if !audioCaptureService.selectedSpeechEngines.isEmpty &&
-               (!audioCaptureService.recognizedText.isEmpty ||
-                !audioCaptureService.appleSpeechText.isEmpty ||
-                !audioCaptureService.whisperKitService.sessionTranscriptions.isEmpty ||
-                !audioCaptureService.appleSpeechHistory.isEmpty) {
+            // Clear text and history buttons (always shown)
+            if !audioCaptureService.recognizedText.isEmpty ||
+               !audioCaptureService.appleSpeechText.isEmpty ||
+               !audioCaptureService.appleSpeechHistory.isEmpty {
                 HStack {
-                    if !audioCaptureService.appleSpeechHistory.isEmpty && audioCaptureService.selectedSpeechEngines.contains(.appleSpeech) {
+                    if !audioCaptureService.appleSpeechHistory.isEmpty {
                         Button("Clear Apple Speech History") {
                             audioCaptureService.clearAppleSpeechHistory()
                         }
                         .buttonStyle(.bordered)
                         .foregroundColor(.green)
-                    }
-
-                    if !audioCaptureService.whisperKitService.sessionTranscriptions.isEmpty && audioCaptureService.selectedSpeechEngines.contains(.whisperKit) {
-                        Button("Clear WhisperKit History") {
-                            audioCaptureService.whisperKitService.clearSession()
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.blue)
                     }
 
                     Spacer()
@@ -46,28 +36,6 @@ struct ControlsView: View {
 
             // Model loading progress and Start/Stop Button
             VStack(spacing: 8) {
-                // Model loading progress for WhisperKit (only if WhisperKit is selected)
-                if audioCaptureService.selectedSpeechEngines.contains(.whisperKit) && !audioCaptureService.isModelLoaded {
-                    VStack(spacing: 4) {
-                        HStack {
-                            Text(audioCaptureService.modelLoadingStatus)
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                            Spacer()
-                            Text(
-                                "\(Int(audioCaptureService.modelLoadingProgress * 100))%"
-                            )
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                        }
-                        ProgressView(
-                            value: audioCaptureService.modelLoadingProgress
-                        )
-                        .progressViewStyle(LinearProgressViewStyle())
-                    }
-                    .padding()
-                }
-
                 Button(action: {
                     if audioCaptureService.isCapturing {
                         // First stop the capture, then show save sheet
@@ -86,9 +54,7 @@ struct ControlsView: View {
                 }
                 .disabled(
                     isStoppingCapture ||
-                    audioCaptureService.selectedSpeechEngines.isEmpty ||
-                    !audioCaptureService.isMicrophoneAccessGranted ||
-                    (audioCaptureService.selectedSpeechEngines.contains(.whisperKit) && !audioCaptureService.isModelLoaded)
+                    !audioCaptureService.isMicrophoneAccessGranted
                 )
             }
             .padding()

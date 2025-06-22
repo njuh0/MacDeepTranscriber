@@ -13,15 +13,12 @@ let package = Package(
         .executable(name: "AudioStudy", targets: ["AudioStudy"])
     ],
     dependencies: [
-        // WhisperKit for native Swift speech recognition
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.7.0")
+        // No external dependencies - using Apple Speech only
     ],
     targets: [
         .executableTarget(
             name: "AudioStudy",
-            dependencies: [
-                "WhisperKit"
-            ],
+            dependencies: [],
             path: "Audio Study"
         )
     ]

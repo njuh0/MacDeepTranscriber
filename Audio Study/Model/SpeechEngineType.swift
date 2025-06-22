@@ -2,7 +2,6 @@ import Foundation
 
 enum SpeechEngineType: String, CaseIterable, Identifiable {
     case appleSpeech = "Apple Speech"
-    case whisperKit = "WhisperKit"
     
     var id: String { self.rawValue }
     
@@ -10,14 +9,12 @@ enum SpeechEngineType: String, CaseIterable, Identifiable {
         switch self {
         case .appleSpeech:
             return "Native Apple Speech Recognition"
-        case .whisperKit:
-            return "OpenAI Whisper (Local)"
         }
     }
     
     var isOnDevice: Bool {
         switch self {
-        case .appleSpeech, .whisperKit:
+        case .appleSpeech:
             return true
         }
     }
@@ -25,8 +22,6 @@ enum SpeechEngineType: String, CaseIterable, Identifiable {
     var supportsMultipleLanguages: Bool {
         switch self {
         case .appleSpeech:
-            return true
-        case .whisperKit:
             return true
         }
     }
