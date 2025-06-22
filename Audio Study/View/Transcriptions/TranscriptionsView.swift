@@ -401,10 +401,7 @@ struct TranscriptionContentView: View {
     @AppStorage("zhipu_api_key") private var zhipuAPIKey: String = ""
     @AppStorage("google_api_key") private var googleAPIKey: String = ""
     
-    // Editing state
-    @State private var editingEngine: String? = nil
-    @State private var editedText: String = ""
-    @State private var isSaving = false
+
     
     private var currentModel: AIModel {
         AIModel(rawValue: selectedModel) ?? .glm4Flash
@@ -431,54 +428,68 @@ struct TranscriptionContentView: View {
                 
                 // Показываем кнопку только если есть оригинальные транскрипции (не AI Enhanced)
                 if !transcriptions.isEmpty && !transcriptions.keys.contains("AI Enhanced") {
-                    Button(action: {
-                        enhanceTranscription()
-                    }) {
-                        HStack(spacing: 6) {
-                            if isEnhancing {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.5)
-                                    .frame(width: 14, height: 14)
-                            } else {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 14))
-                                    .frame(width: 14, height: 14)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        // Отображение текущей модели
+                        Text("Model: \(currentModel.displayName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Button(action: {
+                            enhanceTranscription()
+                        }) {
+                            HStack(spacing: 6) {
+                                if isEnhancing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.5)
+                                        .frame(width: 14, height: 14)
+                                } else {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 14))
+                                        .frame(width: 14, height: 14)
+                                }
+                                Text("AI Enhance")
+                                    .font(.system(size: 14, weight: .medium))
                             }
-                            Text("AI Enhance")
-                                .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isEnhancing)
+                        .help("Enhance transcription quality using \(currentModel.displayName)")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isEnhancing)
-                    .help("Enhance transcription quality using AI")
                 } else if transcriptions.keys.contains("AI Enhanced") {
-                    // Кнопка для повторного улучшения
-                    Button(action: {
-                        enhanceTranscription()
-                    }) {
-                        HStack(spacing: 6) {
-                            if isEnhancing {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .primary))
-                                    .scaleEffect(0.5)
-                                    .frame(width: 14, height: 14)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 14))
-                                    .frame(width: 14, height: 14)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        // Отображение текущей модели
+                        Text("Model: \(currentModel.displayName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        // Кнопка для повторного улучшения
+                        Button(action: {
+                            enhanceTranscription()
+                        }) {
+                            HStack(spacing: 6) {
+                                if isEnhancing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .primary))
+                                        .scaleEffect(0.5)
+                                        .frame(width: 14, height: 14)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 14))
+                                        .frame(width: 14, height: 14)
+                                }
+                                Text("Re-enhance")
+                                    .font(.system(size: 14, weight: .medium))
                             }
-                            Text("Re-enhance")
-                                .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .buttonStyle(.bordered)
+                        .disabled(isEnhancing)
+                        .help("Re-enhance transcription with \(currentModel.displayName)")
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(isEnhancing)
-                    .help("Re-enhance transcription with AI")
                 }
             }
             .padding(.top)
@@ -504,13 +515,7 @@ struct TranscriptionContentView: View {
                         SingleTranscriptionView(
                             engine: engine, 
                             transcription: transcription,
-                            onDelete: { onDeleteTranscription(engine) },
-                            onEdit: { startEditing(engine: engine, text: transcription) },
-                            isEditing: editingEngine == engine,
-                            editedText: $editedText,
-                            onSave: { saveTranscription(engine: engine) },
-                            onCancelEdit: { cancelEditing() },
-                            isSaving: isSaving
+                            onDelete: { onDeleteTranscription(engine) }
                         )
                     } else if originalTranscriptions.count > 1 {
                         // Multiple original transcriptions (if extended in future)
@@ -519,13 +524,7 @@ struct TranscriptionContentView: View {
                                 SingleTranscriptionView(
                                     engine: engine, 
                                     transcription: transcription,
-                                    onDelete: { onDeleteTranscription(engine) },
-                                    onEdit: { startEditing(engine: engine, text: transcription) },
-                                    isEditing: editingEngine == engine,
-                                    editedText: $editedText,
-                                    onSave: { saveTranscription(engine: engine) },
-                                    onCancelEdit: { cancelEditing() },
-                                    isSaving: isSaving
+                                    onDelete: { onDeleteTranscription(engine) }
                                 )
                                 .frame(maxWidth: .infinity)
                             }
@@ -545,13 +544,7 @@ struct TranscriptionContentView: View {
                             SingleTranscriptionView(
                                 engine: "AI Enhanced",
                                 transcription: aiEnhanced,
-                                onDelete: { deleteAIEnhancedTranscription() },
-                                onEdit: { startEditing(engine: "AI Enhanced", text: aiEnhanced) },
-                                isEditing: editingEngine == "AI Enhanced",
-                                editedText: $editedText,
-                                onSave: { saveTranscription(engine: "AI Enhanced") },
-                                onCancelEdit: { cancelEditing() },
-                                isSaving: isSaving
+                                onDelete: { deleteAIEnhancedTranscription() }
                             )
                         }
                     }
@@ -563,79 +556,7 @@ struct TranscriptionContentView: View {
         .padding()
     }
     
-    // MARK: - Editing Functions
-    
-    private func startEditing(engine: String, text: String) {
-        editingEngine = engine
-        editedText = text
-    }
-    
-    private func cancelEditing() {
-        editingEngine = nil
-        editedText = ""
-    }
-    
-    private func saveTranscription(engine: String) {
-        guard !editedText.isEmpty else { return }
-        
-        isSaving = true
-        
-        Task {
-            let documentsPath = "/Users/njuh/Library/Containers/ee.sofuwaru.Audio-Study/Data/Documents"
-            let folderPath = "\(documentsPath)/Recordings/\(folderName)"
-            let fileManager = FileManager.default
-            
-            do {
-                let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
-                
-                for file in folderContents {
-                    if file.hasSuffix(".json") && !file.contains("recording_info") {
-                        let filePath = "\(folderPath)/\(file)"
-                        let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
-                        
-                        if var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            if engine == "Apple Speech" {
-                                // For Apple Speech, update the transcription in appleSpeechTranscriptions array
-                                if var appleSpeechTranscriptions = json["appleSpeechTranscriptions"] as? [[String: Any]] {
-                                    // Update the first transcription (assuming single transcription for now)
-                                    if !appleSpeechTranscriptions.isEmpty {
-                                        appleSpeechTranscriptions[0]["transcription"] = editedText
-                                        json["appleSpeechTranscriptions"] = appleSpeechTranscriptions
-                                    }
-                                }
-                            } else if engine == "AI Enhanced" {
-                                // For AI Enhanced, update the aiEnhancedTranscription field
-                                json["aiEnhancedTranscription"] = editedText
-                            }
-                            
-                            let updatedData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
-                            try updatedData.write(to: URL(fileURLWithPath: filePath))
-                            
-                            print("Saved edited transcription for \(engine) in \(file)")
-                            
-                            // Update UI on main thread
-                            await MainActor.run {
-                                var updatedTranscriptions = self.transcriptions
-                                updatedTranscriptions[engine] = editedText
-                                self.onUpdateTranscriptions(updatedTranscriptions)
-                                
-                                // Reset editing state
-                                self.editingEngine = nil
-                                self.editedText = ""
-                                self.isSaving = false
-                            }
-                            break
-                        }
-                    }
-                }
-            } catch {
-                print("Error saving transcription: \(error)")
-                await MainActor.run {
-                    self.isSaving = false
-                }
-            }
-        }
-    }
+
     
     private func enhanceTranscription() {
         guard !transcriptions.isEmpty else { return }
@@ -1143,66 +1064,48 @@ struct TranscriptionContentView: View {
     // MARK: - Duplicate Detection and Removal
     
     private func removeDuplicateSegments(_ text: String) -> String {
-        // Сначала разделяем текст на предложения, а не на абзацы
-        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        // Разделяем текст на абзацы, а не на предложения, для более консервативного подхода
+        let paragraphs = text.components(separatedBy: CharacterSet.newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && $0.count > 3 } // Снижаем минимальную длину до 3 символов
+            .filter { !$0.isEmpty && $0.count > 10 } // Повышаем минимальную длину до 10 символов
         
-        print("=== Duplicate Detection Started ===")
-        print("Original sentences count: \(sentences.count)")
+        print("=== Duplicate Detection Started (Conservative Mode) ===")
+        print("Original paragraphs count: \(paragraphs.count)")
         print("Original text length: \(text.count) characters")
         
-        var uniqueSentences: [String] = []
-        var seenSentences: [String] = [] // Изменяем на массив для более точного сравнения
+        var uniqueParagraphs: [String] = []
+        var seenParagraphs: [String] = []
         var duplicatesRemoved = 0
         
-        for sentence in sentences {
-            // Normalize sentence for comparison (remove extra spaces, keep case)
-            let normalizedSentence = sentence
+        for paragraph in paragraphs {
+            // Normalize paragraph for comparison (remove extra spaces)
+            let normalizedParagraph = paragraph
                 .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             
             // Создаем ключ для сравнения (убираем case sensitivity только для сравнения)
-            let comparisonKey = normalizedSentence.lowercased()
+            let comparisonKey = normalizedParagraph.lowercased()
             
-            // Skip if we've seen this sentence before (exact match or very high similarity)
+            // Skip if we've seen this paragraph before (только точные совпадения)
             var isDuplicate = false
             
-            // Сначала проверяем на точное совпадение (быстрее)
-            if seenSentences.contains(comparisonKey) {
+            // Проверяем только на точное совпадение для максимальной консервативности
+            if seenParagraphs.contains(comparisonKey) {
                 isDuplicate = true
                 duplicatesRemoved += 1
-                print("Exact duplicate found: '\(String(normalizedSentence.prefix(50)))...'")
-            } else {
-                // Только если нет точного совпадения, проверяем на похожесть
-                for seenSentence in seenSentences {
-                    let similarity = calculateSimilarity(comparisonKey, seenSentence)
-                    if similarity > 0.98 { // Повышаем порог до 98% для еще более точного удаления дубликатов
-                        isDuplicate = true
-                        duplicatesRemoved += 1
-                        print("Similar duplicate found: '\(String(normalizedSentence.prefix(50)))...' (similarity: \(String(format: "%.3f", similarity)))")
-                        break
-                    }
-                }
+                print("Exact duplicate found: '\(String(normalizedParagraph.prefix(50)))...'")
             }
             
             if !isDuplicate {
-                uniqueSentences.append(normalizedSentence)
-                seenSentences.append(comparisonKey)
+                uniqueParagraphs.append(normalizedParagraph)
+                seenParagraphs.append(comparisonKey)
             }
         }
         
-        // Соединяем предложения обратно с правильной пунктуацией
-        let result = uniqueSentences.map { sentence in
-            let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-            // Добавляем точку в конце, если её нет
-            if !trimmed.isEmpty && !".!?".contains(trimmed.last!) {
-                return trimmed + "."
-            }
-            return trimmed
-        }.joined(separator: " ")
+        // Соединяем абзацы обратно с переносами строк
+        let result = uniqueParagraphs.joined(separator: "\n\n")
         
-        print("Unique sentences count: \(uniqueSentences.count)")
+        print("Unique paragraphs count: \(uniqueParagraphs.count)")
         print("Duplicates removed: \(duplicatesRemoved)")
         print("Final text length: \(result.count) characters")
         if text.count > 0 {
@@ -1366,12 +1269,6 @@ struct SingleTranscriptionView: View {
     let engine: String
     let transcription: String
     let onDelete: () -> Void
-    let onEdit: () -> Void
-    let isEditing: Bool
-    @Binding var editedText: String
-    let onSave: () -> Void
-    let onCancelEdit: () -> Void
-    let isSaving: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1385,7 +1282,7 @@ struct SingleTranscriptionView: View {
                         .fontWeight(.semibold)
                     
                     // Счетчик символов
-                    Text("(\(isEditing ? editedText.count : transcription.count) chars)")
+                    Text("(\(transcription.count) chars)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.leading, 4)
@@ -1393,102 +1290,40 @@ struct SingleTranscriptionView: View {
                 
                 Spacer()
                 
-                if isEditing {
-                    // Кнопки сохранения и отмены при редактировании
-                    HStack(spacing: 8) {
-                        Button(action: onCancelEdit) {
-                            Image(systemName: "xmark")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(6)
-                                .background(Color(NSColor.controlBackgroundColor))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Cancel editing")
-                        
-                        Button(action: onSave) {
-                            HStack(spacing: 4) {
-                                if isSaving {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.6)
-                                        .frame(width: 12, height: 12)
-                                } else {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption)
-                                }
-                                Text("Save")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.accentColor)
-                            .cornerRadius(4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .disabled(isSaving)
-                        .help("Save changes")
-                    }
-                } else {
-                    // Кнопки редактирования и удаления
-                    HStack(spacing: 8) {
-                        Button(action: onEdit) {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.accentColor)
-                                .padding(8)
-                                .background(Color(NSColor.controlBackgroundColor))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Edit \(engine) transcription")
-                        
-                        Button(action: onDelete) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.secondary)
-                                .padding(8)
-                                .background(Color(NSColor.controlBackgroundColor))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Delete \(engine) transcription")
-                    }
+                // Кнопка удаления
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(8)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .clipShape(Circle())
                 }
+                .buttonStyle(PlainButtonStyle())
+                .help("Delete \(engine) transcription")
             }
             
             Divider()
             
-            // Текст транскрипции или редактор
-            if isEditing {
-                TextEditor(text: $editedText)
+            // Текст транскрипции (только для чтения)
+            ScrollView {
+                Text(transcription)
                     .font(.body)
+                    .multilineTextAlignment(.leading)
+                    .textSelection(.enabled)
                     .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(NSColor.textBackgroundColor))
                     .cornerRadius(8)
-                    .frame(minHeight: 150, maxHeight: 400)
-            } else {
-                ScrollView {
-                    Text(transcription)
-                        .font(.body)
-                        .multilineTextAlignment(.leading)
-                        .textSelection(.enabled)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(NSColor.textBackgroundColor))
-                        .cornerRadius(8)
-                }
-                .frame(maxHeight: 400)
             }
+            .frame(maxHeight: 400)
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isEditing ? Color.accentColor : Color(NSColor.separatorColor), lineWidth: isEditing ? 2 : 1)
+                .stroke(Color(NSColor.separatorColor), lineWidth: 1)
         )
     }
 }
