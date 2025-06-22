@@ -139,6 +139,15 @@ struct TranscriptionsView: View {
             if !recordingsFolders.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
+                        audioCaptureService.openRecordingsFolder()
+                    }) {
+                        Image(systemName: "folder")
+                            .font(.title2)
+                    }
+                    .help("Open Recordings Folder")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showSidebar.toggle()
                         }
