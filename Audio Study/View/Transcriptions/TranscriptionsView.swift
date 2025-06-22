@@ -200,47 +200,46 @@ struct TranscriptionsView: View {
             let fileManager = FileManager.default
             
             do {
-                let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
-                
-                for file in folderContents {
-                    if file.hasSuffix(".json") && !file.contains("recording_info") {
-                        let filePath = "\(folderPath)/\(file)"
-                        let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
-                        
-                        if var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            let keyToRemove: String
+                if engine == "Apple Speech" {
+                    // Если удаляем Apple Speech, удаляем всю папку независимо от AI Enhanced
+                    try fileManager.removeItem(atPath: folderPath)
+                    print("Deleted entire folder \(folderPath) after removing Apple Speech transcription")
+                    
+                    // Обновляем UI на главном потоке
+                    await MainActor.run {
+                        let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
+                        if let index = self.recordingsFolders.firstIndex(of: folderName) {
+                            self.recordingsFolders.remove(at: index)
+                        }
+                        self.selectedFolder = nil
+                        self.transcriptions = [:]
+                    }
+                } else {
+                    // Для AI Enhanced удаляем только этот ключ из JSON
+                    let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
+                    
+                    for file in folderContents {
+                        if file.hasSuffix(".json") && !file.contains("recording_info") {
+                            let filePath = "\(folderPath)/\(file)"
+                            let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                             
-                            switch engine {
-                            case "Apple Speech":
-                                keyToRemove = "appleSpeechTranscriptions"
-                            case "AI Enhanced":
-                                keyToRemove = "aiEnhancedTranscription"
-                            default:
-                                continue
-                            }
-                            
-                            if json[keyToRemove] != nil {
-                                json.removeValue(forKey: keyToRemove)
-                                
-                                let updatedData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
-                                try updatedData.write(to: URL(fileURLWithPath: filePath))
-                                
-                                print("Deleted \(engine) transcription from \(file)")
-                                
-                                // Обновляем UI на главном потоке
-                                await MainActor.run {
-                                    var updatedTranscriptions = self.transcriptions
-                                    updatedTranscriptions.removeValue(forKey: engine)
-                                    self.transcriptions = updatedTranscriptions
+                            if var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                if json["aiEnhancedTranscription"] != nil {
+                                    json.removeValue(forKey: "aiEnhancedTranscription")
                                     
-                                    // Если больше нет транскрипций, удаляем всю папку
-                                    if updatedTranscriptions.isEmpty {
-                                        Task {
-                                            await self.deleteFolderIfEmpty(folderPath: folderPath)
-                                        }
+                                    let updatedData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+                                    try updatedData.write(to: URL(fileURLWithPath: filePath))
+                                    
+                                    print("Deleted AI Enhanced transcription from \(file)")
+                                    
+                                    // Обновляем UI на главном потоке
+                                    await MainActor.run {
+                                        var updatedTranscriptions = self.transcriptions
+                                        updatedTranscriptions.removeValue(forKey: "AI Enhanced")
+                                        self.transcriptions = updatedTranscriptions
                                     }
+                                    break
                                 }
-                                break
                             }
                         }
                     }
@@ -248,49 +247,6 @@ struct TranscriptionsView: View {
             } catch {
                 print("Error deleting transcription: \(error)")
             }
-        }
-    }
-    
-    private func deleteFolderIfEmpty(folderPath: String) async {
-        let fileManager = FileManager.default
-        
-        do {
-            let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
-            
-            // Проверяем, остались ли JSON файлы с транскрипциями
-            let hasTranscriptionFiles = folderContents.contains { file in
-                if file.hasSuffix(".json") && !file.contains("recording_info") {
-                    let filePath = "\(folderPath)/\(file)"
-                    do {
-                        let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
-                        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            // Check if there are any transcriptions remaining (only Apple Speech now)
-                            return json["appleSpeechTranscriptions"] != nil
-                        }
-                    } catch {
-                        print("Error checking file \(file): \(error)")
-                    }
-                }
-                return false
-            }
-            
-            // Если нет файлов с транскрипциями, удаляем всю папку
-            if !hasTranscriptionFiles {
-                try fileManager.removeItem(atPath: folderPath)
-                print("Deleted empty folder: \(folderPath)")
-                
-                // Обновляем список папок и сбрасываем выбор
-                await MainActor.run {
-                    let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
-                    if let index = self.recordingsFolders.firstIndex(of: folderName) {
-                        self.recordingsFolders.remove(at: index)
-                        self.selectedFolder = nil
-                        self.transcriptions = [:]
-                    }
-                }
-            }
-        } catch {
-            print("Error checking/deleting folder: \(error)")
         }
     }
     
