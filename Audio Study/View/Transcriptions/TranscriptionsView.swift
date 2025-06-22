@@ -437,6 +437,11 @@ struct TranscriptionContentView: View {
     @AppStorage("zhipu_api_key") private var zhipuAPIKey: String = ""
     @AppStorage("google_api_key") private var googleAPIKey: String = ""
     
+    // Editing state
+    @State private var editingEngine: String? = nil
+    @State private var editedText: String = ""
+    @State private var isSaving = false
+    
     private var currentModel: AIModel {
         AIModel(rawValue: selectedModel) ?? .glm4Flash
     }
@@ -535,7 +540,13 @@ struct TranscriptionContentView: View {
                         SingleTranscriptionView(
                             engine: engine, 
                             transcription: transcription,
-                            onDelete: { onDeleteTranscription(engine) }
+                            onDelete: { onDeleteTranscription(engine) },
+                            onEdit: { startEditing(engine: engine, text: transcription) },
+                            isEditing: editingEngine == engine,
+                            editedText: $editedText,
+                            onSave: { saveTranscription(engine: engine) },
+                            onCancelEdit: { cancelEditing() },
+                            isSaving: isSaving
                         )
                     } else if originalTranscriptions.count > 1 {
                         // Multiple original transcriptions (if extended in future)
@@ -544,7 +555,13 @@ struct TranscriptionContentView: View {
                                 SingleTranscriptionView(
                                     engine: engine, 
                                     transcription: transcription,
-                                    onDelete: { onDeleteTranscription(engine) }
+                                    onDelete: { onDeleteTranscription(engine) },
+                                    onEdit: { startEditing(engine: engine, text: transcription) },
+                                    isEditing: editingEngine == engine,
+                                    editedText: $editedText,
+                                    onSave: { saveTranscription(engine: engine) },
+                                    onCancelEdit: { cancelEditing() },
+                                    isSaving: isSaving
                                 )
                                 .frame(maxWidth: .infinity)
                             }
@@ -564,7 +581,13 @@ struct TranscriptionContentView: View {
                             SingleTranscriptionView(
                                 engine: "AI Enhanced",
                                 transcription: aiEnhanced,
-                                onDelete: { deleteAIEnhancedTranscription() }
+                                onDelete: { deleteAIEnhancedTranscription() },
+                                onEdit: { startEditing(engine: "AI Enhanced", text: aiEnhanced) },
+                                isEditing: editingEngine == "AI Enhanced",
+                                editedText: $editedText,
+                                onSave: { saveTranscription(engine: "AI Enhanced") },
+                                onCancelEdit: { cancelEditing() },
+                                isSaving: isSaving
                             )
                         }
                     }
@@ -574,6 +597,80 @@ struct TranscriptionContentView: View {
             Spacer()
         }
         .padding()
+    }
+    
+    // MARK: - Editing Functions
+    
+    private func startEditing(engine: String, text: String) {
+        editingEngine = engine
+        editedText = text
+    }
+    
+    private func cancelEditing() {
+        editingEngine = nil
+        editedText = ""
+    }
+    
+    private func saveTranscription(engine: String) {
+        guard !editedText.isEmpty else { return }
+        
+        isSaving = true
+        
+        Task {
+            let documentsPath = "/Users/njuh/Library/Containers/ee.sofuwaru.Audio-Study/Data/Documents"
+            let folderPath = "\(documentsPath)/Recordings/\(folderName)"
+            let fileManager = FileManager.default
+            
+            do {
+                let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
+                
+                for file in folderContents {
+                    if file.hasSuffix(".json") && !file.contains("recording_info") {
+                        let filePath = "\(folderPath)/\(file)"
+                        let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+                        
+                        if var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            if engine == "Apple Speech" {
+                                // For Apple Speech, update the transcription in appleSpeechTranscriptions array
+                                if var appleSpeechTranscriptions = json["appleSpeechTranscriptions"] as? [[String: Any]] {
+                                    // Update the first transcription (assuming single transcription for now)
+                                    if !appleSpeechTranscriptions.isEmpty {
+                                        appleSpeechTranscriptions[0]["transcription"] = editedText
+                                        json["appleSpeechTranscriptions"] = appleSpeechTranscriptions
+                                    }
+                                }
+                            } else if engine == "AI Enhanced" {
+                                // For AI Enhanced, update the aiEnhancedTranscription field
+                                json["aiEnhancedTranscription"] = editedText
+                            }
+                            
+                            let updatedData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+                            try updatedData.write(to: URL(fileURLWithPath: filePath))
+                            
+                            print("Saved edited transcription for \(engine) in \(file)")
+                            
+                            // Update UI on main thread
+                            await MainActor.run {
+                                var updatedTranscriptions = self.transcriptions
+                                updatedTranscriptions[engine] = editedText
+                                self.onUpdateTranscriptions(updatedTranscriptions)
+                                
+                                // Reset editing state
+                                self.editingEngine = nil
+                                self.editedText = ""
+                                self.isSaving = false
+                            }
+                            break
+                        }
+                    }
+                }
+            } catch {
+                print("Error saving transcription: \(error)")
+                await MainActor.run {
+                    self.isSaving = false
+                }
+            }
+        }
     }
     
     private func enhanceTranscription() {
@@ -1080,10 +1177,16 @@ struct SingleTranscriptionView: View {
     let engine: String
     let transcription: String
     let onDelete: () -> Void
+    let onEdit: () -> Void
+    let isEditing: Bool
+    @Binding var editedText: String
+    let onSave: () -> Void
+    let onCancelEdit: () -> Void
+    let isSaving: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Заголовок движка с кнопкой удаления
+            // Заголовок движка с кнопками
             HStack {
                 HStack {
                     Image(systemName: "brain.head.profile")
@@ -1093,7 +1196,7 @@ struct SingleTranscriptionView: View {
                         .fontWeight(.semibold)
                     
                     // Счетчик символов
-                    Text("(\(transcription.count) chars)")
+                    Text("(\(isEditing ? editedText.count : transcription.count) chars)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.leading, 4)
@@ -1101,30 +1204,94 @@ struct SingleTranscriptionView: View {
                 
                 Spacer()
                 
-                Button(action: onDelete) {
-                    Image(systemName: "xmark")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(6)
-                        .background(Color(NSColor.controlBackgroundColor))
-                        .clipShape(Circle())
+                if isEditing {
+                    // Кнопки сохранения и отмены при редактировании
+                    HStack(spacing: 8) {
+                        Button(action: onCancelEdit) {
+                            Image(systemName: "xmark")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(6)
+                                .background(Color(NSColor.controlBackgroundColor))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Cancel editing")
+                        
+                        Button(action: onSave) {
+                            HStack(spacing: 4) {
+                                if isSaving {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.6)
+                                        .frame(width: 12, height: 12)
+                                } else {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption)
+                                }
+                                Text("Save")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.accentColor)
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .disabled(isSaving)
+                        .help("Save changes")
+                    }
+                } else {
+                    // Кнопки редактирования и удаления
+                    HStack(spacing: 8) {
+                        Button(action: onEdit) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.accentColor)
+                                .padding(8)
+                                .background(Color(NSColor.controlBackgroundColor))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Edit \(engine) transcription")
+                        
+                        Button(action: onDelete) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(8)
+                                .background(Color(NSColor.controlBackgroundColor))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Delete \(engine) transcription")
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
-                .help("Delete \(engine) transcription")
             }
             
             Divider()
             
-            // Текст транскрипции
-            ScrollView {
-                Text(transcription)
+            // Текст транскрипции или редактор
+            if isEditing {
+                TextEditor(text: $editedText)
                     .font(.body)
-                    .multilineTextAlignment(.leading)
-                    .textSelection(.enabled)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
                     .background(Color(NSColor.textBackgroundColor))
                     .cornerRadius(8)
+                    .frame(minHeight: 150, maxHeight: 400)
+            } else {
+                ScrollView {
+                    Text(transcription)
+                        .font(.body)
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .cornerRadius(8)
+                }
+                .frame(maxHeight: 400)
             }
         }
         .padding()
@@ -1132,7 +1299,7 @@ struct SingleTranscriptionView: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                .stroke(isEditing ? Color.accentColor : Color(NSColor.separatorColor), lineWidth: isEditing ? 2 : 1)
         )
     }
 }
