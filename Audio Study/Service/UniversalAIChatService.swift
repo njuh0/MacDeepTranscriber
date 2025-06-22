@@ -7,6 +7,28 @@
 
 import Foundation
 
+// MARK: - AI Model Output Limits
+private func getMaxOutputTokens(for model: AIModel) -> Int {
+    switch model.displayName {
+    case "GLM-4":
+        return 4095 // Maximum output tokens for GLM-4
+    case "GLM-4-Flash":
+        return 4095 // Maximum output tokens for GLM-4-Flash  
+    case "ChatGLM3-6B":
+        return 4095 // Maximum output tokens for ChatGLM3-6B
+    case "Gemini 2.0 Flash":
+        return 8192 // Much higher limit for Gemini 2.0 Flash
+    default:
+        // Fallback based on provider
+        switch model.provider {
+        case .zhipuAI:
+            return 4095 // Default for ZhipuAI models
+        case .googleAI:
+            return 8192 // Default for Google models (higher capacity)
+        }
+    }
+}
+
 // MARK: - Universal AI Chat Service
 @MainActor
 class UniversalAIChatService: ObservableObject {
@@ -99,7 +121,7 @@ class UniversalAIChatService: ObservableObject {
             messages: glmMessages,
             stream: false,
             temperature: 0.7,
-            maxTokens: 1000
+            maxTokens: getMaxOutputTokens(for: model)
         )
         
         guard let url = URL(string: model.provider.baseURL) else {
@@ -177,7 +199,7 @@ class UniversalAIChatService: ObservableObject {
             systemInstruction: systemInstructionContent,
             generationConfig: GeminiGenerationConfig(
                 temperature: 0.7,
-                maxOutputTokens: 1000
+                maxOutputTokens: getMaxOutputTokens(for: model)
             )
         )
         
