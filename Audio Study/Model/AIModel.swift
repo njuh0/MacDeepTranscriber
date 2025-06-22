@@ -10,8 +10,6 @@ import Foundation
 // MARK: - AI Model Types
 enum AIModel: String, CaseIterable, Identifiable {
     case glm4Flash = "glm-4-flash"
-    case glm4 = "glm-4"
-    case chatglm3 = "chatglm3-6b"
     case gemini2Flash = "gemini-2.0-flash-exp"
     
     var id: String { rawValue }
@@ -20,10 +18,6 @@ enum AIModel: String, CaseIterable, Identifiable {
         switch self {
         case .glm4Flash:
             return "GLM-4-Flash"
-        case .glm4:
-            return "GLM-4"
-        case .chatglm3:
-            return "ChatGLM3-6B"
         case .gemini2Flash:
             return "Gemini 2.0 Flash"
         }
@@ -32,19 +26,15 @@ enum AIModel: String, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .glm4Flash:
-            return "Fastest AI model, optimized for quick responses"
-        case .glm4:
-            return "Balanced AI model with good quality and speed"
-        case .chatglm3:
-            return "Open-source conversational AI model"
+            return "Fastest AI model from Zhipu AI, optimized for quick responses"
         case .gemini2Flash:
-            return "Google's latest AI model with enhanced reasoning"
+            return "Google's latest AI model with enhanced reasoning and large context window"
         }
     }
     
     var provider: AIProvider {
         switch self {
-        case .glm4Flash, .glm4, .chatglm3:
+        case .glm4Flash:
             return .zhipuAI
         case .gemini2Flash:
             return .googleAI
@@ -61,7 +51,7 @@ enum AIModel: String, CaseIterable, Identifiable {
     
     var freeTierDetails: String {
         switch self {
-        case .glm4Flash, .glm4, .chatglm3:
+        case .glm4Flash:
             return "Free tier: 1M tokens/month"
         case .gemini2Flash:
             return "Free tier: 1500 requests/day"

@@ -10,67 +10,31 @@ import Foundation
 
 // MARK: - Context Window Limits
 private func getContextWindowLimit(for model: AIModel) -> Int {
-    switch model.displayName {
-    case "GLM-4":
+    switch model {
+    case .glm4Flash:
         return 8192
-    case "GLM-4-Flash":
-        return 8192
-    case "ChatGLM3-6B":
-        return 8192 // Standard version, could be 32k or 128k for extended versions
-    case "Gemini 2.0 Flash":
+    case .gemini2Flash:
         return 1_000_000
-    default:
-        // Fallback based on provider
-        switch model.provider {
-        case .zhipuAI:
-            return 8192 // Default for ZhipuAI models
-        case .googleAI:
-            return 1_000_000 // Default for Google models (Gemini series)
-        }
     }
 }
 
 // MARK: - Output Token Limits
 private func getMaxOutputTokens(for model: AIModel) -> Int {
-    switch model.displayName {
-    case "GLM-4":
-        return 4095 // Maximum output tokens for GLM-4
-    case "GLM-4-Flash":
-        return 4095 // Maximum output tokens for GLM-4-Flash  
-    case "ChatGLM3-6B":
-        return 4095 // Maximum output tokens for ChatGLM3-6B
-    case "Gemini 2.0 Flash":
-        return 8192 // Much higher limit for Gemini 2.0 Flash
-    default:
-        // Fallback based on provider
-        switch model.provider {
-        case .zhipuAI:
-            return 4095 // Default for ZhipuAI models
-        case .googleAI:
-            return 8192 // Default for Google models (higher capacity)
-        }
+    switch model {
+    case .glm4Flash:
+        return 4095
+    case .gemini2Flash:
+        return 8192
     }
 }
 
 // MARK: - Chunk Size Limits
 private func getMaxChunkSize(for model: AIModel) -> Int {
-    switch model.displayName {
-    case "GLM-4":
-        return 16_000 // 16k characters for GLM-4
-    case "GLM-4-Flash":
+    switch model {
+    case .glm4Flash:
         return 16_000 // 16k characters for GLM-4-Flash
-    case "ChatGLM3-6B":
-        return 16_000 // 16k characters for ChatGLM3-6B
-    case "Gemini 2.0 Flash":
+    case .gemini2Flash:
         return 32_000 // 32k characters for Gemini 2.0 Flash (much larger capacity)
-    default:
-        // Fallback based on provider
-        switch model.provider {
-        case .zhipuAI:
-            return 16_000 // Default for ZhipuAI models
-        case .googleAI:
-            return 32_000 // Default for Google models (higher capacity)
-        }
     }
 }
 
@@ -718,18 +682,36 @@ struct TranscriptionContentView: View {
                 
                 if allTranscriptions.count <= maxChunkSize {
                     // Обрабатываем весь текст за один раз
-                    enhancedText = try await processTranscriptionChunk(allTranscriptions)
+                    let rawEnhanced = try await processTranscriptionChunk(allTranscriptions)
+                    
+                    // Для отладки: временно отключаем удаление дубликатов
+                    let shouldRemoveDuplicates = false // Изменить на true для включения удаления дубликатов
+                    enhancedText = shouldRemoveDuplicates ? removeDuplicateSegments(rawEnhanced) : rawEnhanced
+                    
+                    if !shouldRemoveDuplicates {
+                        print("⚠️  Duplicate removal is DISABLED for debugging")
+                    }
                 } else {
                     // Разбиваем на части и обрабатываем каждую
-                    enhancedText = try await processLargeTranscription(allTranscriptions, maxChunkSize: maxChunkSize, folderName: folderName)
+                    let rawEnhanced = try await processLargeTranscription(allTranscriptions, maxChunkSize: maxChunkSize, folderName: folderName)
+                    
+                    // Для отладки: временно отключаем удаление дубликатов
+                    let shouldRemoveDuplicates = false // Изменить на true для включения удаления дубликатов
+                    enhancedText = shouldRemoveDuplicates ? removeDuplicateSegments(rawEnhanced) : rawEnhanced
+                    
+                    if !shouldRemoveDuplicates {
+                        print("⚠️  Duplicate removal is DISABLED for debugging")
+                    }
                 }
                 
                 // Сохраняем AI Enhanced транскрипцию в JSON
                 await saveAIEnhancedTranscription(enhancedText)
                 
                 print("=== AI Enhancement Completed ===")
+                print("Original text length: \(allTranscriptions.count) characters")
                 print("Enhanced text length: \(enhancedText.count) characters")
                 print("Model used: \(currentModel.displayName)")
+                print("Duplicates were processed and removed")
                 
                 await MainActor.run {
                     self.isEnhancing = false
@@ -752,23 +734,36 @@ struct TranscriptionContentView: View {
         print("=== Processing Single Chunk ===")
         print("Chunk length: \(text.count) characters (~\(chunkTokens) tokens)")
         print("Context usage: \(contextUsagePercent)% (\(chunkTokens)/\(maxContextTokens) tokens)")
+        print("Detected language pattern: \(detectLanguage(in: text))")
+        print("Language will be auto-detected by AI model")
         
         let prompt = """
-        I have transcriptions from speech recognition engines that contain errors and need cleaning. Please fix and improve this transcription by:
+        I have a speech recognition transcription that contains errors and needs cleaning. Please analyze the language and fix this transcription by:
 
-        1. Correcting obvious spelling and grammar mistakes
-        2. Fixing punctuation and capitalization
-        3. Removing duplicate words or phrases that appear to be recognition errors
-        4. Ensuring proper sentence structure and flow
-        5. Keeping ALL the original content - do not summarize or shorten
+        1. Automatically detecting the language of the transcription
+        2. Correcting obvious spelling mistakes and typos in that language
+        3. Fixing punctuation, capitalization, and spacing according to language rules
+        4. Removing duplicate sentences, paragraphs or phrases that appear to be recognition errors
+        5. Completing cut-off words or sentences that end abruptly
+        6. Ensuring proper sentence structure and natural flow for the detected language
+        7. Fixing names and technical terms that were misrecognized
+        8. Adding missing punctuation marks appropriate for the language
+        9. Keeping ALL the original unique content - do not summarize or shorten
 
-        IMPORTANT: Return the complete cleaned transcription, maintaining all the original information and content length.
+        IMPORTANT: 
+        - First detect the language, then apply language-specific corrections
+        - Return the complete cleaned transcription without duplications
+        - Maintain all the original unique information and meaning
+        - If text is repeated multiple times, keep only one clean version
+        - Complete any sentences that end abruptly or are cut off
+        - Ensure natural language flow according to the detected language's grammar rules
+        - Preserve the original language - do not translate
 
-        Here are the transcriptions to clean:
+        Here is the transcription to clean:
 
         \(text)
 
-        Please provide the complete cleaned transcription:
+        Please provide the complete cleaned transcription in the same language:
         """
        
         
@@ -786,6 +781,8 @@ struct TranscriptionContentView: View {
         print("Context window limit: \(maxContextTokens) tokens")
         print("Max chunk size: \(maxChunkSize) characters")
         print("Total text length: \(text.count) characters (~\(estimateTokenCount(text)) tokens)")
+        print("Detected language pattern: \(detectLanguage(in: text))")
+        print("Language will be auto-detected by AI model for each chunk")
         print("Starting conversation with empty history (isolated per recording)")
         
         // Более умное разбиение на равные части с поиском границ
@@ -941,28 +938,32 @@ struct TranscriptionContentView: View {
             }
             
             let prompt = """
-            I have part \(index + 1) of \(chunks.count) of a speech transcription. Please make MINIMAL corrections only for obvious errors.
+            I have part \(index + 1) of \(chunks.count) of a speech transcription. Please make corrections for errors while preserving the original meaning and language.
 
-            Only fix:
-            1. Clear spelling mistakes
-            2. Missing spaces between words  
-            3. Obvious duplicate words that are recognition errors
-            4. Basic punctuation where clearly missing
+            Please:
+            1. Automatically detect the language of this text part
+            2. Fix clear spelling mistakes and typos in that language
+            3. Correct missing spaces between words  
+            4. Remove obvious duplicate words or phrases that are recognition errors
+            5. Add basic punctuation where clearly missing according to language rules
+            6. Complete cut-off words or incomplete sentences
+            7. Fix names and technical terms that were misrecognized
 
-            DO NOT:
-            - Rephrase or rewrite anything
-            - Change the speaking style
-            - Add words that weren't there
-            - Make stylistic changes
-            - Summarize or shorten
+            IMPORTANT RULES:
+            - Keep the original content, meaning, and language intact
+            - Do NOT translate to another language
+            - Do NOT rephrase or rewrite in your own words
+            - Do NOT change the speaking style or add explanations
+            - Do NOT summarize or shorten the content
+            - If this part seems to repeat content from previous parts, still process it (duplicates will be handled separately)
+            - Complete any sentences that end abruptly
+            - Apply language-specific grammar and punctuation rules
 
-            Keep this part as close to the original as possible.
-
-            Original part:
+            Original part \(index + 1)/\(chunks.count):
 
             \(chunk)
 
-            Minimally corrected version:
+            Corrected version (same language):
             """
             
             // Преобразуем историю в формат для AI сервиса
@@ -1097,6 +1098,31 @@ struct TranscriptionContentView: View {
         }
     }
     
+    // MARK: - Language Detection Helper
+    
+    private func detectLanguage(in text: String) -> String {
+        let sampleText = text.prefix(200) // Первые 200 символов для определения
+        
+        // Проверяем различные языки
+        if sampleText.range(of: "[а-яёі]", options: [.regularExpression, .caseInsensitive]) != nil {
+            return "Cyrillic (Russian/Ukrainian/etc.)"
+        } else if sampleText.range(of: "[\\u4e00-\\u9fff\\u3040-\\u309f\\u30a0-\\u30ff]", options: [.regularExpression]) != nil {
+            return "CJK (Chinese/Japanese/Korean)"
+        } else if sampleText.range(of: "[\\u0600-\\u06ff\\u0750-\\u077f]", options: [.regularExpression]) != nil {
+            return "Arabic"
+        } else if sampleText.range(of: "[\\u0590-\\u05ff]", options: [.regularExpression]) != nil {
+            return "Hebrew"
+        } else if sampleText.range(of: "[àáâãäåæçèéêëìíîïñòóôõöøùúûüý]", options: [.regularExpression, .caseInsensitive]) != nil {
+            return "Romance Language (French/Spanish/Italian/etc.)"
+        } else if sampleText.range(of: "[äöüß]", options: [.regularExpression, .caseInsensitive]) != nil {
+            return "German"
+        } else if sampleText.range(of: "[a-z]", options: [.regularExpression, .caseInsensitive]) != nil {
+            return "Latin-based (English/etc.)"
+        } else {
+            return "Unknown/Mixed"
+        }
+    }
+    
     // MARK: - Debug Functions
     
     func logAllModelLimits() {
@@ -1114,26 +1140,188 @@ struct TranscriptionContentView: View {
         print("===============================")
     }
     
+    // MARK: - Duplicate Detection and Removal
+    
+    private func removeDuplicateSegments(_ text: String) -> String {
+        // Сначала разделяем текст на предложения, а не на абзацы
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count > 3 } // Снижаем минимальную длину до 3 символов
+        
+        print("=== Duplicate Detection Started ===")
+        print("Original sentences count: \(sentences.count)")
+        print("Original text length: \(text.count) characters")
+        
+        var uniqueSentences: [String] = []
+        var seenSentences: [String] = [] // Изменяем на массив для более точного сравнения
+        var duplicatesRemoved = 0
+        
+        for sentence in sentences {
+            // Normalize sentence for comparison (remove extra spaces, keep case)
+            let normalizedSentence = sentence
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Создаем ключ для сравнения (убираем case sensitivity только для сравнения)
+            let comparisonKey = normalizedSentence.lowercased()
+            
+            // Skip if we've seen this sentence before (exact match or very high similarity)
+            var isDuplicate = false
+            
+            // Сначала проверяем на точное совпадение (быстрее)
+            if seenSentences.contains(comparisonKey) {
+                isDuplicate = true
+                duplicatesRemoved += 1
+                print("Exact duplicate found: '\(String(normalizedSentence.prefix(50)))...'")
+            } else {
+                // Только если нет точного совпадения, проверяем на похожесть
+                for seenSentence in seenSentences {
+                    let similarity = calculateSimilarity(comparisonKey, seenSentence)
+                    if similarity > 0.98 { // Повышаем порог до 98% для еще более точного удаления дубликатов
+                        isDuplicate = true
+                        duplicatesRemoved += 1
+                        print("Similar duplicate found: '\(String(normalizedSentence.prefix(50)))...' (similarity: \(String(format: "%.3f", similarity)))")
+                        break
+                    }
+                }
+            }
+            
+            if !isDuplicate {
+                uniqueSentences.append(normalizedSentence)
+                seenSentences.append(comparisonKey)
+            }
+        }
+        
+        // Соединяем предложения обратно с правильной пунктуацией
+        let result = uniqueSentences.map { sentence in
+            let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Добавляем точку в конце, если её нет
+            if !trimmed.isEmpty && !".!?".contains(trimmed.last!) {
+                return trimmed + "."
+            }
+            return trimmed
+        }.joined(separator: " ")
+        
+        print("Unique sentences count: \(uniqueSentences.count)")
+        print("Duplicates removed: \(duplicatesRemoved)")
+        print("Final text length: \(result.count) characters")
+        if text.count > 0 {
+            print("Compression ratio: \(String(format: "%.1f", Double(text.count) / Double(result.count)))x")
+        }
+        print("=== Duplicate Detection Completed ===")
+        
+        return result
+    }
+    
+    private func calculateSimilarity(_ text1: String, _ text2: String) -> Double {
+        // Используем комбинацию методов для более точного сравнения
+        
+        // 1. Точное совпадение
+        if text1 == text2 {
+            return 1.0
+        }
+        
+        // 2. Если тексты слишком разные по длине, они не дубликаты
+        let lengthRatio = Double(min(text1.count, text2.count)) / Double(max(text1.count, text2.count))
+        if lengthRatio < 0.5 {
+            return 0.0
+        }
+        
+        // 3. Jaccard similarity по словам
+        let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
+        
+        let intersection = words1.intersection(words2)
+        let union = words1.union(words2)
+        
+        let jaccardSimilarity = union.isEmpty ? 0.0 : Double(intersection.count) / Double(union.count)
+        
+        // 4. Levenshtein distance для коротких строк (до 100 символов)
+        let levenshteinSimilarity: Double
+        if text1.count <= 100 && text2.count <= 100 {
+            let distance = levenshteinDistance(text1, text2)
+            let maxLength = max(text1.count, text2.count)
+            levenshteinSimilarity = maxLength > 0 ? 1.0 - Double(distance) / Double(maxLength) : 1.0
+        } else {
+            levenshteinSimilarity = jaccardSimilarity // Fallback для длинных строк
+        }
+        
+        // Возвращаем максимальное значение из двух методов
+        return max(jaccardSimilarity, levenshteinSimilarity)
+    }
+    
+    private func levenshteinDistance(_ str1: String, _ str2: String) -> Int {
+        let len1 = str1.count
+        let len2 = str2.count
+        
+        if len1 == 0 { return len2 }
+        if len2 == 0 { return len1 }
+        
+        let str1Array = Array(str1)
+        let str2Array = Array(str2)
+        
+        var dp = Array(repeating: Array(repeating: 0, count: len2 + 1), count: len1 + 1)
+        
+        for i in 0...len1 {
+            dp[i][0] = i
+        }
+        
+        for j in 0...len2 {
+            dp[0][j] = j
+        }
+        
+        for i in 1...len1 {
+            for j in 1...len2 {
+                if str1Array[i - 1] == str2Array[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1]
+                } else {
+                    dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+                }
+            }
+        }
+        
+        return dp[len1][len2]
+    }
+    
     // MARK: - Helper Functions
     
     private func estimateTokenCount(_ text: String) -> Int {
-        // Более точная оценка токенов:
-        // - Английский текст: ~4 символа на токен
-        // - Русский текст: ~6-8 символов на токен (кириллица менее эффективна)
-        // - Пробелы и знаки препинания учитываются отдельно
+        // Более точная оценка токенов для разных языков:
+        // - Английский/латинские языки: ~4 символа на токен
+        // - Кириллические языки (русский, украинский, болгарский): ~6-7 символов на токен
+        // - Языки с иероглифами (китайский, японский): ~2-3 символа на токен
+        // - Арабский/иврит: ~5-6 символов на токен
+        // - Другие языки: среднее значение
         
         let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         let avgCharactersPerToken: Double
         
-        // Определяем тип текста по первым словам
-        let sampleText = words.prefix(10).joined()
-        let cyrillicRange = sampleText.range(of: "[а-яё]", options: [.regularExpression, .caseInsensitive])
+        // Определяем тип языка по содержанию текста
+        let sampleText = words.prefix(20).joined() // Увеличиваем выборку для лучшего определения
+        
+        // Проверяем кириллицу (русский, украинский, болгарский, сербский и т.д.)
+        let cyrillicRange = sampleText.range(of: "[а-яёі]", options: [.regularExpression, .caseInsensitive])
+        
+        // Проверяем китайские/японские иероглифы
+        let cjkRange = sampleText.range(of: "[\\u4e00-\\u9fff\\u3040-\\u309f\\u30a0-\\u30ff]", options: [.regularExpression])
+        
+        // Проверяем арабский текст
+        let arabicRange = sampleText.range(of: "[\\u0600-\\u06ff\\u0750-\\u077f]", options: [.regularExpression])
+        
+        // Проверяем иврит
+        let hebrewRange = sampleText.range(of: "[\\u0590-\\u05ff]", options: [.regularExpression])
         
         if cyrillicRange != nil {
-            // Русский текст - менее эффективное токенизирование
+            // Кириллические языки - менее эффективное токенизирование
             avgCharactersPerToken = 6.5
+        } else if cjkRange != nil {
+            // Китайский/японский - очень эффективное токенизирование
+            avgCharactersPerToken = 2.5
+        } else if arabicRange != nil || hebrewRange != nil {
+            // Арабский/иврит - умеренно эффективное токенизирование
+            avgCharactersPerToken = 5.5
         } else {
-            // Английский или другой латинский текст
+            // Английский и другие латинские языки
             avgCharactersPerToken = 4.0
         }
         
@@ -1164,10 +1352,11 @@ struct TranscriptionContentView: View {
         print("Max chunk size: \(chunkSize) characters")
         print("Context/Output ratio: \(String(format: "%.1f", ratio))x")
         
-        if currentModel.provider == .googleAI {
-            print("ℹ️  Google AI models have very large context windows and chunk sizes")
-        } else {
-            print("⚠️  ZhipuAI models have smaller context windows - optimal chunking applied")
+        switch currentModel {
+        case .gemini2Flash:
+            print("ℹ️  Google AI model with very large context window - excellent for multi-language processing")
+        case .glm4Flash:
+            print("⚠️  ZhipuAI model with smaller context window - optimal chunking applied for any language")
         }
         print("=====================================")
     }

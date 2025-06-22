@@ -9,23 +9,11 @@ import Foundation
 
 // MARK: - AI Model Output Limits  
 private func getMaxOutputTokens(for model: AIModel) -> Int {
-    switch model.displayName {
-    case "GLM-4":
-        return 4095 // Maximum output tokens for GLM-4
-    case "GLM-4-Flash":
-        return 4095 // Maximum output tokens for GLM-4-Flash  
-    case "ChatGLM3-6B":
-        return 4095 // Maximum output tokens for ChatGLM3-6B
-    case "Gemini 2.0 Flash":
-        return 8192 // Much higher limit for Gemini 2.0 Flash
-    default:
-        // Fallback based on provider
-        switch model.provider {
-        case .zhipuAI:
-            return 4095 // Default for ZhipuAI models
-        case .googleAI:
-            return 8192 // Default for Google models (higher capacity)
-        }
+    switch model {
+    case .glm4Flash:
+        return 4095
+    case .gemini2Flash:
+        return 8192
     }
 }
 
