@@ -64,7 +64,7 @@ struct DetailView: View {
                 case .transcriptions:
                     TranscriptionsView(audioCaptureService: audioCaptureService)
                 case .learnWords:
-                    LearnWordsView()
+                    WordSorterView(audioCaptureService: audioCaptureService)
                 case .aiChat:
                     AIChatView()
                 case .settings:

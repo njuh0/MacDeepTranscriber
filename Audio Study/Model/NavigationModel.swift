@@ -10,7 +10,7 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case record = "Record"
     case transcriptions = "Transcriptions"
-    case learnWords = "Learn words"
+    case learnWords = "Word Sorter"
     case aiChat = "AI Chat"
     case settings = "Settings"
     
@@ -23,7 +23,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .transcriptions:
             return "doc.text"
         case .learnWords:
-            return "book.circle"
+            return "square.3.layers.3d"
         case .aiChat:
             return "bubble.left.and.bubble.right"
         case .settings:

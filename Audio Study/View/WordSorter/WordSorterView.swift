@@ -1,5 +1,5 @@
 //
-//  LearnWordsView.swift
+//  WordSorterView.swift
 //  Audio Study
 //
 //  Created on 20.06.2025.
@@ -8,7 +8,7 @@
 import SwiftUI
 import Foundation
 
-struct LearnWordsView: View {
+struct WordSorterView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
     @State private var showSidebar = true
     @State private var recordingsFolders: [String] = []
@@ -21,7 +21,7 @@ struct LearnWordsView: View {
             VStack(spacing: 20) {
                 if let selectedFolder = selectedFolder {
                     // Показываем выбранную запись для сортировки слов
-                    LearnWordsContentView(
+                    WordSorterContentView(
                         folderName: selectedFolder,
                         transcriptions: transcriptions
                     )
@@ -88,7 +88,7 @@ struct LearnWordsView: View {
             
             // Сайдбар справа
             if showSidebar && !recordingsFolders.isEmpty {
-                LearnWordsRightSidebarView(
+                WordSorterRightSidebarView(
                     recordingsFolders: recordingsFolders,
                     selectedFolder: $selectedFolder,
                     loadTranscriptions: loadTranscriptions
@@ -225,7 +225,7 @@ struct LearnWordsView: View {
     }
 }
 
-struct LearnWordsRightSidebarView: View {
+struct WordSorterRightSidebarView: View {
     let recordingsFolders: [String]
     @Binding var selectedFolder: String?
     let loadTranscriptions: (String) -> Void
@@ -283,7 +283,7 @@ struct LearnWordsRightSidebarView: View {
     }
 }
 
-struct LearnWordsContentView: View {
+struct WordSorterContentView: View {
     let folderName: String
     let transcriptions: [String: String]
     
@@ -551,5 +551,5 @@ struct WordTableView: View {
 }
 
 #Preview {
-    LearnWordsView(audioCaptureService: AudioCaptureService())
+    WordSorterView(audioCaptureService: AudioCaptureService())
 }
