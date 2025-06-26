@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import NaturalLanguage
 
 struct WordSorterView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
@@ -137,7 +138,10 @@ struct WordSorterView: View {
         transcriptions = [:]
         
         Task {
-            let documentsPath = "/Users/njuh/Library/Containers/ee.sofuwaru.Audio-Study/Data/Documents"
+            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+                print("Could not get documents directory")
+                return
+            }
             let folderPath = "\(documentsPath)/Recordings/\(folderName)"
             let fileManager = FileManager.default
             
@@ -162,9 +166,16 @@ struct WordSorterView: View {
                             let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                             
-                            if let transcription = json?["transcription"] as? String, !transcription.isEmpty {
-                                newTranscriptions["Apple Speech"] = transcription
-                                print("Found Apple Speech transcription in \(file): \(transcription.prefix(50))...")
+                            // Обработка appleSpeechTranscriptions массива
+                            if let appleSpeechTranscriptions = json?["appleSpeechTranscriptions"] as? [[String: Any]] {
+                                let transcriptions = appleSpeechTranscriptions.compactMap { item in
+                                    return item["transcription"] as? String
+                                }
+                                let combinedTranscription = transcriptions.joined(separator: " ")
+                                if !combinedTranscription.isEmpty {
+                                    newTranscriptions["Apple Speech"] = combinedTranscription
+                                    print("Found Apple Speech transcription in \(file): \(combinedTranscription.prefix(50))...")
+                                }
                             }
                             
                             if let aiTranscription = json?["aiEnhancedTranscription"] as? String, !aiTranscription.isEmpty {
@@ -189,7 +200,10 @@ struct WordSorterView: View {
     
     private func loadRecordingsFolders() {
         DispatchQueue.global(qos: .userInitiated).async {
-            let documentsPath = "/Users/njuh/Library/Containers/ee.sofuwaru.Audio-Study/Data/Documents"
+            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+                print("Could not get documents directory")
+                return
+            }
             let recordingsPath = "\(documentsPath)/Recordings"
             let fileManager = FileManager.default
             
@@ -290,31 +304,29 @@ struct WordSorterContentView: View {
     // Сохраняемые данные
     @AppStorage("knownWords") private var knownWordsData: String = ""
     @AppStorage("unknownWords") private var unknownWordsData: String = ""
+    @AppStorage("useLemmatization") private var useLemmatization: Bool = true
+    @AppStorage("useEnhancedTranscription") private var useEnhancedTranscription: Bool = true
     
     // Состояние для таблиц
     @State private var knownWords: Set<String> = []
     @State private var unknownWords: Set<String> = []
     @State private var draggedWord: String? = nil
     
+    // Получаем выбранную транскрипцию
+    private var selectedTranscription: String {
+        if useEnhancedTranscription && transcriptions["AI Enhanced"] != nil {
+            return transcriptions["AI Enhanced"] ?? ""
+        } else {
+            return transcriptions["Apple Speech"] ?? ""
+        }
+    }
+    
     // Слова из текущей транскрипции, которых нет в других таблицах
     private var currentTranscriptionWords: [String] {
-        guard !transcriptions.isEmpty else { return [] }
+        guard !selectedTranscription.isEmpty else { return [] }
         
-        // Получаем все слова из транскрипций
-        let allText = transcriptions.values.joined(separator: " ")
-        let words = allText
-            .components(separatedBy: .whitespacesAndNewlines)
-            .compactMap { word in
-                let cleanWord = word
-                    .trimmingCharacters(in: .punctuationCharacters)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .lowercased()
-                
-                if cleanWord.count >= 3 && !cleanWord.isEmpty && !cleanWord.allSatisfy(\.isNumber) {
-                    return cleanWord
-                }
-                return nil
-            }
+        // Получаем слова из выбранной транскрипции
+        let words = useLemmatization ? extractAndLemmatizeWords(from: selectedTranscription) : extractSimpleWords(from: selectedTranscription)
         
         let uniqueWords = Set(words)
         
@@ -368,44 +380,86 @@ struct WordSorterContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // Три таблицы
-                HStack(spacing: 16) {
-                    // Левая таблица - Знакомые слова
-                    WordTableView(
-                        title: "I Know",
-                        words: Array(knownWords).sorted(),
-                        color: .green,
-                        icon: "checkmark.circle.fill",
-                        draggedWord: $draggedWord,
-                        onWordDrop: { word in
-                            moveWordToKnown(word)
+                VStack(spacing: 12) {
+                    // Панель управления
+                    if transcriptions["AI Enhanced"] != nil {
+                        HStack {
+                            Toggle("AI Enhanced", isOn: $useEnhancedTranscription)
+                                .toggleStyle(.switch)
+                                .font(.caption)
+                            
+                            Spacer()
                         }
-                    )
+                        .padding(.horizontal)
+                    }
+                    
+                    HStack(alignment: .top, spacing: 16) {
+                    // Левая таблица - Знакомые слова
+                    VStack(spacing: 8) {
+                        // Пустое пространство для выравнивания с центральной таблицей
+                        Color.clear
+                            .frame(height: 20)
+                        
+                        WordTableView(
+                            title: "I Know",
+                            words: Array(knownWords).sorted(),
+                            color: .green,
+                            icon: "checkmark.circle.fill",
+                            draggedWord: $draggedWord,
+                            onWordDrop: { word in
+                                moveWordToKnown(word)
+                            }
+                        )
+                    }
                     
                     // Средняя таблица - Слова из текущей транскрипции
-                    WordTableView(
-                        title: "Current Recording",
-                        words: currentTranscriptionWords,
-                        color: .blue,
-                        icon: "doc.text.fill",
-                        draggedWord: $draggedWord,
-                        onWordDrop: { word in
-                            moveWordToCurrent(word)
+                    VStack(spacing: 8) {
+                        // Переключатель лемматизации над таблицей
+                        HStack(spacing: 8) {
+                            Toggle("Smart processing", isOn: $useLemmatization)
+                                .toggleStyle(.switch)
+                                .font(.caption)
+                            
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                                .help("When enabled, converts words to their base form (e.g., 'running' → 'run', 'better' → 'good') and filters only meaningful words: nouns, verbs, adjectives, and adverbs")
                         }
-                    )
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(height: 20) // Фиксированная высота для выравнивания
+                        
+                        WordTableView(
+                            title: "Current Recording",
+                            words: currentTranscriptionWords,
+                            color: .blue,
+                            icon: "doc.text.fill",
+                            draggedWord: $draggedWord,
+                            onWordDrop: { word in
+                                moveWordToCurrent(word)
+                            }
+                        )
+                    }
                     
                     // Правая таблица - Незнакомые слова
-                    WordTableView(
-                        title: "Don't Know",
-                        words: Array(unknownWords).sorted(),
-                        color: .red,
-                        icon: "questionmark.circle.fill",
-                        draggedWord: $draggedWord,
-                        onWordDrop: { word in
-                            moveWordToUnknown(word)
-                        }
-                    )
+                    VStack(spacing: 8) {
+                        // Пустое пространство для выравнивания с центральной таблицей
+                        Color.clear
+                            .frame(height: 20)
+                        
+                        WordTableView(
+                            title: "Don't Know",
+                            words: Array(unknownWords).sorted(),
+                            color: .red,
+                            icon: "questionmark.circle.fill",
+                            draggedWord: $draggedWord,
+                            onWordDrop: { word in
+                                moveWordToUnknown(word)
+                            }
+                        )
+                    }
                 }
                 .frame(maxHeight: .infinity)
+                }
             }
         }
         .padding()
@@ -454,99 +508,84 @@ struct WordSorterContentView: View {
     }
     
     private func moveWordToCurrent(_ word: String) {
-        // Просто удаляем из других таблиц, слово останется в currentTranscriptionWords
+        // Просто удаляем из других таблиц, независимо от того, есть ли слово в текущей транскрипции
+        // Слово появится в currentTranscriptionWords только если оно действительно есть в транскрипции
         knownWords.remove(word)
         unknownWords.remove(word)
         saveWords()
     }
-}
-
-struct WordTableView: View {
-    let title: String
-    let words: [String]
-    let color: Color
-    let icon: String
-    @Binding var draggedWord: String?
-    let onWordDrop: (String) -> Void
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Заголовок таблицы
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(color)
-                Spacer()
-                Text("\(words.count)")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(color.opacity(0.1))
-                    .foregroundColor(color)
-                    .cornerRadius(6)
+    // MARK: - Natural Language Processing
+    
+    private func extractAndLemmatizeWords(from text: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+        
+        let tagger = NLTagger(tagSchemes: [.lemma, .lexicalClass])
+        tagger.string = text
+        
+        var lemmatizedWords: [String] = []
+        
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { tokenRange, _ in
+            let word = String(text[tokenRange])
+            
+            // Базовая очистка
+            let cleanWord = word
+                .trimmingCharacters(in: .punctuationCharacters)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            
+            // Проверяем базовые условия
+            guard cleanWord.count >= 3,
+                  !cleanWord.isEmpty,
+                  !cleanWord.allSatisfy(\.isNumber) else {
+                return true
             }
             
-            Divider()
-                .background(color.opacity(0.5))
+            // Проверяем, что это действительно слово (не пунктуация, числа и т.д.)
+            let lexicalClassResult = tagger.tag(at: tokenRange.lowerBound, unit: .word, scheme: .lexicalClass)
+            let lexicalClass = lexicalClassResult.0
             
-            // Список слов
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(words, id: \.self) { word in
-                        Text(word)
-                            .font(.body)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(color.opacity(0.1))
-                            .foregroundColor(color)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(color.opacity(0.3), lineWidth: 1)
-                            )
-                            .scaleEffect(draggedWord == word ? 0.95 : 1.0)
-                            .opacity(draggedWord == word ? 0.7 : 1.0)
-                            .onDrag {
-                                draggedWord = word
-                                return NSItemProvider(object: word as NSString)
-                            }
-                            .animation(.easeInOut(duration: 0.2), value: draggedWord)
-                    }
-                    
-                    if words.isEmpty {
-                        Text("No words")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 20)
-                    }
+            // Фильтруем только существительные, глаголы, прилагательные и наречия
+            guard let tagValue = lexicalClass?.rawValue,
+                  ["Noun", "Verb", "Adjective", "Adverb"].contains(tagValue) else {
+                return true
+            }
+            
+            // Получаем лемму (базовую форму)
+            let lemmaResult = tagger.tag(at: tokenRange.lowerBound, unit: .word, scheme: .lemma)
+            if let lemma = lemmaResult.0?.rawValue {
+                let cleanLemma = lemma.lowercased()
+                if cleanLemma.count >= 3 && !cleanLemma.allSatisfy(\.isNumber) {
+                    lemmatizedWords.append(cleanLemma)
                 }
-                .padding(.vertical, 8)
+            } else {
+                // Если лемма не найдена, используем очищенное слово
+                lemmatizedWords.append(cleanWord)
             }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color.opacity(0.3), lineWidth: 2)
-        )
-        .onDrop(of: [.text], isTargeted: nil) { providers in
-            guard let provider = providers.first else { return false }
             
-            provider.loadObject(ofClass: NSString.self) { item, error in
-                if let word = item as? String {
-                    DispatchQueue.main.async {
-                        onWordDrop(word)
-                        draggedWord = nil
-                    }
-                }
-            }
             return true
         }
+        
+        return lemmatizedWords
+    }
+    
+    // MARK: - Simple Word Processing
+    
+    private func extractSimpleWords(from text: String) -> [String] {
+        return text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .compactMap { word in
+                let cleanWord = word
+                    .trimmingCharacters(in: .punctuationCharacters)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                
+                if cleanWord.count >= 3 && !cleanWord.isEmpty && !cleanWord.allSatisfy(\.isNumber) {
+                    return cleanWord
+                }
+                return nil
+            }
     }
 }
 
