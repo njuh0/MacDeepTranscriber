@@ -55,6 +55,7 @@ struct AIChatView: View {
     @State private var recordingsFolders: [String] = []
     @State private var selectedFolders: Set<String> = []
     @State private var transcriptions: [String: String] = [:]
+    @State private var enhancedFolders: [String: Bool] = [:]
 
     var body: some View {
         HStack(spacing: 0) {
@@ -77,7 +78,8 @@ struct AIChatView: View {
             if showSidebar {
                 AIChatRightSidebarView(
                     recordingsFolders: recordingsFolders,
-                    selectedFolders: $selectedFolders
+                    selectedFolders: $selectedFolders,
+                    enhancedFolders: enhancedFolders
                 )
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing),
@@ -383,31 +385,55 @@ struct AIChatView: View {
             }
             let recordingsPath = "\(documentsPath)/Recordings"
             let fileManager = FileManager.default
-            
+
             guard fileManager.fileExists(atPath: recordingsPath) else {
                 print("Recordings folder does not exist at: \(recordingsPath)")
                 return
             }
-            
+
             do {
                 let folderContents = try fileManager.contentsOfDirectory(atPath: recordingsPath)
                 var foldersWithJSON: [String] = []
-                
+                var newEnhancedFolders: [String: Bool] = [:]
+
                 for item in folderContents {
                     let itemPath = "\(recordingsPath)/\(item)"
                     var isDirectory: ObjCBool = false
-                    
+
                     if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory) && isDirectory.boolValue {
-                        // Проверяем, есть ли JSON файлы в папке
-                        let folderContents = try fileManager.contentsOfDirectory(atPath: itemPath)
-                        if folderContents.contains(where: { $0.hasSuffix(".json") }) {
+                        let subfolderContents = try fileManager.contentsOfDirectory(atPath: itemPath)
+                        var hasJson = false
+                        var isEnhanced = false
+
+                        for file in subfolderContents {
+                            if file.hasSuffix(".json") && !file.contains("recording_info") {
+                                hasJson = true
+                                let filePath = "\(itemPath)/\(file)"
+                                do {
+                                    let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+                                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                                    if let aiTranscription = json?["aiEnhancedTranscription"] as? String, !aiTranscription.isEmpty {
+                                        isEnhanced = true
+                                        break
+                                    }
+                                } catch {
+                                    print("Error reading JSON file \(file) in \(item): \(error)")
+                                }
+                            }
+                        }
+
+                        if hasJson {
                             foldersWithJSON.append(item)
+                            if isEnhanced {
+                                newEnhancedFolders[item] = true
+                            }
                         }
                     }
                 }
-                
+
                 DispatchQueue.main.async {
                     self.recordingsFolders = foldersWithJSON.sorted()
+                    self.enhancedFolders = newEnhancedFolders
                 }
             } catch {
                 print("Error loading recordings folders: \(error)")
@@ -462,6 +488,9 @@ struct AIChatView: View {
                             if let aiTranscription = json?["aiEnhancedTranscription"] as? String, !aiTranscription.isEmpty {
                                 newTranscriptions["AI Enhanced"] = aiTranscription
                                 print("Found AI Enhanced transcription in \(file): \(aiTranscription.prefix(50))...")
+                                await MainActor.run {
+                                    self.enhancedFolders[folderName] = true
+                                }
                             }
                         } catch {
                             print("Error reading JSON file \(file): \(error)")

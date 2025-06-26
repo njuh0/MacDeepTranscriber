@@ -11,6 +11,7 @@ import SwiftUI
 struct AIChatRightSidebarView: View {
     let recordingsFolders: [String]
     @Binding var selectedFolders: Set<String>
+    let enhancedFolders: [String: Bool]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -30,6 +31,11 @@ struct AIChatRightSidebarView: View {
                         Text(folder)
                             .font(.system(size: 14))
                             .foregroundColor(.primary)
+                        if enhancedFolders[folder] == true {
+                            Image(systemName: "sparkles")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
                         Spacer()
                     }
                     .padding(.vertical, 6)
