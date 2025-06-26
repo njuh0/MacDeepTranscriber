@@ -51,28 +51,62 @@ struct AIChatView: View {
         aiService.isLoading
     }
     
+    @State private var showSidebar = true
+    @State private var recordingsFolders: [String] = []
+    @State private var selectedFolder: String? = nil
+    @State private var transcriptions: [String: String] = [:]
+    @State private var selectedTranscription: String? = nil
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerView
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                // Header
+                headerView
+                
+                Divider()
+                
+                // Messages List
+                messagesView
+                
+                Divider()
+                
+                // Input Area
+                inputView
+            }
+            .background(Color(NSColor.controlBackgroundColor))
             
-            Divider()
-            
-            // Messages List
-            messagesView
-            
-            Divider()
-            
-            // Input Area
-            inputView
+            if showSidebar {
+                AIChatRightSidebarView(
+                    recordingsFolders: recordingsFolders,
+                    selectedFolder: $selectedFolder,
+                    loadTranscriptions: loadTranscriptions
+                )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing),
+                    removal: .move(edge: .trailing)
+                ))
+            }
         }
-        .background(Color(NSColor.controlBackgroundColor))
         .onAppear {
             setupInitialMessages()
             loadConfiguration()
+            loadRecordingsFolders()
         }
         .onReceive(NotificationCenter.default.publisher(for: .aiSettingsChanged)) { _ in
             loadConfiguration()
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showSidebar.toggle()
+                    }
+                }) {
+                    Image(systemName: "sidebar.right")
+                        .foregroundColor(.primary)
+                }
+                .help(showSidebar ? "Hide Right Sidebar" : "Show Right Sidebar")
+            }
         }
     }
     
@@ -280,16 +314,19 @@ struct AIChatView: View {
         }
         
         let messageText = currentMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Add user message
+
+        // Add user message to the UI
         messages.append(ChatMessage(content: messageText, isFromUser: true))
         currentMessage = ""
         
+        // Get conversation history for AI (excluding the current message)
+        let conversationHistoryForAI = Array(messages.dropLast())
+
         // Send to AI API
         Task {
             do {
                 let customPrompt = customPromptEnabled ? customPromptText : nil
-                let aiResponse = try await aiService.sendMessage(messageText, conversationHistory: messages, customPrompt: customPrompt)
+                let aiResponse = try await aiService.sendMessage(messageText, transcription: selectedTranscription, conversationHistory: conversationHistoryForAI, customPrompt: customPrompt)
                 await MainActor.run {
                     messages.append(ChatMessage(content: aiResponse, isFromUser: false))
                 }
@@ -341,6 +378,116 @@ struct AIChatView: View {
                 content: welcomeMessage,
                 isFromUser: false
             )
+        }
+    }
+
+    private func loadRecordingsFolders() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+                print("Could not get documents directory")
+                return
+            }
+            let recordingsPath = "\(documentsPath)/Recordings"
+            let fileManager = FileManager.default
+            
+            guard fileManager.fileExists(atPath: recordingsPath) else {
+                print("Recordings folder does not exist at: \(recordingsPath)")
+                return
+            }
+            
+            do {
+                let folderContents = try fileManager.contentsOfDirectory(atPath: recordingsPath)
+                var foldersWithJSON: [String] = []
+                
+                for item in folderContents {
+                    let itemPath = "\(recordingsPath)/\(item)"
+                    var isDirectory: ObjCBool = false
+                    
+                    if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory) && isDirectory.boolValue {
+                        // Проверяем, есть ли JSON файлы в папке
+                        let folderContents = try fileManager.contentsOfDirectory(atPath: itemPath)
+                        if folderContents.contains(where: { $0.hasSuffix(".json") }) {
+                            foldersWithJSON.append(item)
+                        }
+                    }
+                }
+                
+                DispatchQueue.main.async {
+                    self.recordingsFolders = foldersWithJSON.sorted()
+                }
+            } catch {
+                print("Error loading recordings folders: \(error)")
+            }
+        }
+    }
+
+    private func loadTranscriptions(for folderName: String) {
+        print("Loading transcriptions for folder: \(folderName)")
+        
+        // Очищаем предыдущие транскрипции на главном потоке
+        transcriptions = [:]
+        
+        Task {
+            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+                print("Could not get documents directory")
+                return
+            }
+            let folderPath = "\(documentsPath)/Recordings/\(folderName)"
+            let fileManager = FileManager.default
+            
+            var newTranscriptions: [String: String] = [:]
+            
+            do {
+                print("Checking folder path: \(folderPath)")
+                
+                guard fileManager.fileExists(atPath: folderPath) else {
+                    print("Folder does not exist: \(folderPath)")
+                    return
+                }
+                
+                let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
+                print("Folder contents: \(folderContents)")
+                
+                for file in folderContents {
+                    if file.hasSuffix(".json") && !file.contains("recording_info") {
+                        let filePath = "\(folderPath)/\(file)"
+                        
+                        do {
+                            let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+                            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                            
+                            // Обработка appleSpeechTranscriptions массива
+                            if let appleSpeechTranscriptions = json?["appleSpeechTranscriptions"] as? [[String: Any]] {
+                                let transcriptions = appleSpeechTranscriptions.compactMap { item in
+                                    return item["transcription"] as? String
+                                }
+                                let combinedTranscription = transcriptions.joined(separator: " ")
+                                if !combinedTranscription.isEmpty {
+                                    newTranscriptions["Apple Speech"] = combinedTranscription
+                                    print("Found Apple Speech transcription in \(file): \(combinedTranscription.prefix(50))...")
+                                }
+                            }
+                            
+                            if let aiTranscription = json?["aiEnhancedTranscription"] as? String, !aiTranscription.isEmpty {
+                                newTranscriptions["AI Enhanced"] = aiTranscription
+                                print("Found AI Enhanced transcription in \(file): \(aiTranscription.prefix(50))...")
+                            }
+                        } catch {
+                            print("Error reading JSON file \(file): \(error)")
+                        }
+                    }
+                }
+                
+                await MainActor.run {
+                    self.transcriptions = newTranscriptions
+                    print("Updated transcriptions: \(self.transcriptions.keys)")
+                    if let transcription = newTranscriptions["AI Enhanced"] ?? newTranscriptions["Apple Speech"] {
+                        self.selectedTranscription = transcription
+                    }
+                }
+            } catch {
+                print("Error loading transcriptions from folder \(folderName): \(error)")
+            }
         }
     }
 }

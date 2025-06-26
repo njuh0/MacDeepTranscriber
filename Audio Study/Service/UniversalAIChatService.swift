@@ -48,7 +48,7 @@ class UniversalAIChatService: ObservableObject {
         errorMessage = nil
     }
     
-    func sendMessage(_ userMessage: String, conversationHistory: [ChatMessage], customPrompt: String? = nil) async throws -> String {
+    func sendMessage(_ userMessage: String, transcription: String?, conversationHistory: [ChatMessage], customPrompt: String? = nil) async throws -> String {
         guard !apiKey.isEmpty else {
             throw AIError.missingAPIKey
         }
@@ -58,6 +58,13 @@ class UniversalAIChatService: ObservableObject {
         
         defer {
             isLoading = false
+        }
+        
+        let finalUserMessage: String
+        if let transcription = transcription, !transcription.isEmpty {
+            finalUserMessage = "Transcription: \(transcription)\n\nUser message: \(userMessage)"
+        } else {
+            finalUserMessage = userMessage
         }
         
         // Prepare system instruction
@@ -75,9 +82,9 @@ class UniversalAIChatService: ObservableObject {
         
         switch model.provider {
         case .zhipuAI:
-            return try await sendToZhipuAI(userMessage, conversationHistory: conversationHistory, systemInstruction: systemInstruction)
+            return try await sendToZhipuAI(finalUserMessage, conversationHistory: conversationHistory, systemInstruction: systemInstruction)
         case .googleAI:
-            return try await sendToGoogleAI(userMessage, conversationHistory: conversationHistory, systemInstruction: systemInstruction)
+            return try await sendToGoogleAI(finalUserMessage, conversationHistory: conversationHistory, systemInstruction: systemInstruction)
         }
     }
     

@@ -706,7 +706,7 @@ struct TranscriptionContentView: View {
         """
        
         
-        return try await aiService.sendMessage(prompt, conversationHistory: [])
+        return try await aiService.sendMessage(prompt, transcription: nil, conversationHistory: [])
     }
     
     private func processLargeTranscription(_ text: String, maxChunkSize: Int, folderName: String) async throws -> String {
@@ -923,7 +923,7 @@ struct TranscriptionContentView: View {
             
             print("[Session \(sessionId)] Sending chunk \(index + 1) to AI with \(chatHistory.count) messages in conversation history")
             
-            let enhancedChunk = try await aiService.sendMessage(prompt, conversationHistory: chatHistory)
+            let enhancedChunk = try await aiService.sendMessage(prompt, transcription: nil, conversationHistory: chatHistory)
             let cleanedChunk = enhancedChunk.trimmingCharacters(in: .whitespacesAndNewlines)
             enhancedChunks.append(cleanedChunk)
             
