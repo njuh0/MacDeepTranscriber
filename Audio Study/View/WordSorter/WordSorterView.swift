@@ -344,31 +344,14 @@ struct WordSorterContentView: View {
                 
                 Spacer()
                 
-                // Статистика
-                HStack(spacing: 16) {
-                    Text("Known: \(knownWords.count)")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.green.opacity(0.1))
-                        .foregroundColor(.green)
-                        .cornerRadius(6)
-                    
-                    Text("Current: \(currentTranscriptionWords.count)")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(6)
-                    
-                    Text("Unknown: \(unknownWords.count)")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(6)
+                if transcriptions["AI Enhanced"] != nil {
+                    HStack {
+                        Toggle("AI Enhanced", isOn: $useEnhancedTranscription)
+                            .toggleStyle(.switch)
+                            .font(.caption)
+                        
+                    }
+                    .padding(.horizontal)
                 }
             }
             .padding(.top)
@@ -381,17 +364,6 @@ struct WordSorterContentView: View {
             } else {
                 // Три таблицы
                 VStack(spacing: 12) {
-                    // Панель управления
-                    if transcriptions["AI Enhanced"] != nil {
-                        HStack {
-                            Toggle("AI Enhanced", isOn: $useEnhancedTranscription)
-                                .toggleStyle(.switch)
-                                .font(.caption)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                    }
                     
                     HStack(alignment: .top, spacing: 16) {
                     // Левая таблица - Знакомые слова

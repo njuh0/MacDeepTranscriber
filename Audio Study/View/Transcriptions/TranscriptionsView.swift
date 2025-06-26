@@ -168,11 +168,11 @@ struct TranscriptionsView: View {
         guard let selectedFolder = selectedFolder else { return }
         
         Task {
-            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 print("Could not get documents directory")
                 return
             }
-            let folderPath = "\(documentsPath)/Recordings/\(selectedFolder)"
+            let folderPath = documentsURL.appendingPathComponent("Recordings").appendingPathComponent(selectedFolder).path
             let fileManager = FileManager.default
             
             do {
@@ -233,11 +233,11 @@ struct TranscriptionsView: View {
         transcriptions = [:]
         
         Task {
-            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 print("Could not get documents directory")
                 return
             }
-            let folderPath = "\(documentsPath)/Recordings/\(folderName)"
+            let folderPath = documentsURL.appendingPathComponent("Recordings").appendingPathComponent(folderName).path
             let fileManager = FileManager.default
             
             var newTranscriptions: [String: String] = [:]
@@ -308,11 +308,11 @@ struct TranscriptionsView: View {
     
     private func loadRecordingsFolders() {
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 print("Could not get documents directory")
                 return
             }
-            let recordingsPath = "\(documentsPath)/Recordings"
+            let recordingsPath = documentsURL.appendingPathComponent("Recordings").path
             let fileManager = FileManager.default
             
             guard fileManager.fileExists(atPath: recordingsPath) else {
@@ -961,11 +961,11 @@ struct TranscriptionContentView: View {
     }
     
     private func saveAIEnhancedTranscription(_ enhancedText: String) async {
-        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             print("Could not get documents directory")
             return
         }
-        let folderPath = "\(documentsPath)/Recordings/\(folderName)"
+        let folderPath = documentsURL.appendingPathComponent("Recordings").appendingPathComponent(folderName).path
         let fileManager = FileManager.default
         
         do {
@@ -1001,11 +1001,11 @@ struct TranscriptionContentView: View {
     }
     
     private func deleteAIEnhancedTranscription() {
-        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             print("Could not get documents directory")
             return
         }
-        let folderPath = "\(documentsPath)/Recordings/\(folderName)"
+        let folderPath = documentsURL.appendingPathComponent("Recordings").appendingPathComponent(folderName).path
         let fileManager = FileManager.default
         
         Task {

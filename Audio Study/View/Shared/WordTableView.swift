@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 struct WordTableView: View {
     let title: String
@@ -25,6 +27,16 @@ struct WordTableView: View {
                     .font(.headline)
                     .foregroundColor(color)
                 Spacer()
+                
+                // Export button
+                Button(action: exportWords) {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundColor(color)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Export word list")
+                .disabled(words.isEmpty)
+                
                 Text("\(words.count)")
                     .font(.caption)
                     .padding(.horizontal, 8)
@@ -92,6 +104,60 @@ struct WordTableView: View {
                 }
             }
             return true
+        }
+    }
+    
+    // MARK: - Export Functions
+    
+    private func exportWords() {
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.plainText, .commaSeparatedText]
+        savePanel.nameFieldStringValue = "\(title.replacingOccurrences(of: " ", with: "_"))_words"
+        savePanel.message = "Choose location and format to save word list"
+        
+        // Add accessory view for format selection
+        let formatView = NSStackView()
+        formatView.orientation = .horizontal
+        formatView.spacing = 10
+        
+        let formatLabel = NSTextField(labelWithString: "Format:")
+        let formatPopup = NSPopUpButton()
+        formatPopup.addItems(withTitles: ["Plain Text (.txt)", "CSV (.csv)"])
+        
+        formatView.addArrangedSubview(formatLabel)
+        formatView.addArrangedSubview(formatPopup)
+        savePanel.accessoryView = formatView
+        
+        savePanel.begin { response in
+            guard response == .OK, let url = savePanel.url else { return }
+            
+            let selectedFormat = formatPopup.indexOfSelectedItem
+            let content: String
+            
+            switch selectedFormat {
+            case 0: // Plain text
+                content = words.joined(separator: "\n")
+            case 1: // CSV
+                content = "Word\n" + words.map { "\"\($0)\"" }.joined(separator: "\n")
+            default:
+                content = words.joined(separator: "\n")
+            }
+            
+            do {
+                try content.write(to: url, atomically: true, encoding: .utf8)
+                print("Word list exported successfully to \(url.path)")
+            } catch {
+                print("Failed to export word list: \(error)")
+                // Show error alert
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "Export Failed"
+                    alert.informativeText = "Could not save the word list: \(error.localizedDescription)"
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                }
+            }
         }
     }
 }
