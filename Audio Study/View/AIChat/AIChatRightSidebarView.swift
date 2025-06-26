@@ -10,8 +10,7 @@ import SwiftUI
 
 struct AIChatRightSidebarView: View {
     let recordingsFolders: [String]
-    @Binding var selectedFolder: String?
-    let loadTranscriptions: (String) -> Void
+    @Binding var selectedFolders: Set<String>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,7 +25,7 @@ struct AIChatRightSidebarView: View {
 
                 List(recordingsFolders, id: \.self) { folder in
                     HStack {
-                        Image(systemName: "book.closed")
+                        Image(systemName: selectedFolders.contains(folder) ? "checkmark.square.fill" : "square")
                             .foregroundColor(.blue)
                         Text(folder)
                             .font(.system(size: 14))
@@ -36,16 +35,17 @@ struct AIChatRightSidebarView: View {
                     .padding(.vertical, 6)
                     .padding(.horizontal, 8)
                     .background(
-                        selectedFolder == folder ?
+                        selectedFolders.contains(folder) ?
                             Color.accentColor.opacity(0.2) :
                             Color.clear
                     )
                     .cornerRadius(6)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        selectedFolder = folder
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            loadTranscriptions(folder)
+                        if selectedFolders.contains(folder) {
+                            selectedFolders.remove(folder)
+                        } else {
+                            selectedFolders.insert(folder)
                         }
                     }
                 }

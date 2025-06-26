@@ -53,9 +53,8 @@ struct AIChatView: View {
     
     @State private var showSidebar = true
     @State private var recordingsFolders: [String] = []
-    @State private var selectedFolder: String? = nil
+    @State private var selectedFolders: Set<String> = []
     @State private var transcriptions: [String: String] = [:]
-    @State private var selectedTranscription: String? = nil
 
     var body: some View {
         HStack(spacing: 0) {
@@ -78,8 +77,7 @@ struct AIChatView: View {
             if showSidebar {
                 AIChatRightSidebarView(
                     recordingsFolders: recordingsFolders,
-                    selectedFolder: $selectedFolder,
-                    loadTranscriptions: loadTranscriptions
+                    selectedFolders: $selectedFolders
                 )
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing),
@@ -88,12 +86,21 @@ struct AIChatView: View {
             }
         }
         .onAppear {
-            setupInitialMessages()
             loadConfiguration()
             loadRecordingsFolders()
+            for folder in selectedFolders {
+                loadTranscriptions(for: folder)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .aiSettingsChanged)) { _ in
             loadConfiguration()
+        }
+        .onChange(of: selectedFolders) { folders in
+            for folder in folders {
+                if transcriptions[folder] == nil {
+                    loadTranscriptions(for: folder)
+                }
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -167,13 +174,14 @@ struct AIChatView: View {
     }
     
     // MARK: - Messages View
+    @ViewBuilder
     private var messagesView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if messages.isEmpty {
-                        emptyStateView
-                    } else {
+        if messages.isEmpty {
+            emptyStateView
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
                         ForEach(messages) { message in
                             MessageBubbleView(message: message)
                                 .id(message.id)
@@ -183,13 +191,13 @@ struct AIChatView: View {
                             loadingIndicator
                         }
                     }
+                    .padding()
                 }
-                .padding()
-            }
-            .onChange(of: messages.count) { _ in
-                if let lastMessage = messages.last {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                .onChange(of: messages.count) { _ in
+                    if let lastMessage = messages.last {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -237,6 +245,7 @@ struct AIChatView: View {
     // MARK: - Empty State View
     private var emptyStateView: some View {
         VStack(spacing: 16) {
+            Spacer()
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 50))
                 .foregroundColor(.blue.opacity(0.6))
@@ -249,8 +258,8 @@ struct AIChatView: View {
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            Spacer()
         }
-        .padding(.top, 60)
     }
     
     // MARK: - Loading Indicator
@@ -285,24 +294,9 @@ struct AIChatView: View {
     }
     
     // MARK: - Methods
-    private func setupInitialMessages() {
-        let welcomeMessage: String
-        
-        if customPromptEnabled && !customPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            welcomeMessage = "Hello! I'm your AI assistant powered by \(currentModel.displayName). I'm configured with your custom instructions and ready to help you."
-        } else {
-            welcomeMessage = "Hello! I'm your AI language assistant powered by \(currentModel.displayName). I'm here to help you practice your language skills. What would you like to talk about?"
-        }
-        
-        messages.append(ChatMessage(
-            content: welcomeMessage,
-            isFromUser: false
-        ))
-    }
-    
     private func sendMessage() {
         guard canSendMessage else { return }
-        
+
         // Check if API key is set
         if currentAPIKey.isEmpty {
             // Show message to go to settings
@@ -312,21 +306,37 @@ struct AIChatView: View {
             ))
             return
         }
-        
+
         let messageText = currentMessage.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Add user message to the UI
         messages.append(ChatMessage(content: messageText, isFromUser: true))
         currentMessage = ""
-        
+
         // Get conversation history for AI (excluding the current message)
         let conversationHistoryForAI = Array(messages.dropLast())
+
+        // Construct the prompt with selected transcriptions
+        var prompt = messageText
+        if !selectedFolders.isEmpty {
+            let selectedTranscriptions = selectedFolders.compactMap { transcriptions[$0] }
+            if !selectedTranscriptions.isEmpty {
+                if selectedTranscriptions.count == 1 {
+                    prompt = "Transcription: \(selectedTranscriptions[0])\n\nUser message: \(messageText)"
+                } else {
+                    let transcriptionList = selectedTranscriptions.enumerated().map { (index, transcription) in
+                        "Transcription \(index + 1):\n\(transcription)"
+                    }.joined(separator: "\n\n")
+                    prompt = "\(transcriptionList)\n\nUser message: \(messageText)"
+                }
+            }
+        }
 
         // Send to AI API
         Task {
             do {
                 let customPrompt = customPromptEnabled ? customPromptText : nil
-                let aiResponse = try await aiService.sendMessage(messageText, transcription: selectedTranscription, conversationHistory: conversationHistoryForAI, customPrompt: customPrompt)
+                let aiResponse = try await aiService.sendMessage(prompt, conversationHistory: conversationHistoryForAI, customPrompt: customPrompt)
                 await MainActor.run {
                     messages.append(ChatMessage(content: aiResponse, isFromUser: false))
                 }
@@ -344,7 +354,6 @@ struct AIChatView: View {
     
     private func clearChat() {
         messages.removeAll()
-        setupInitialMessages()
     }
     
     private func copyAllMessages() {
@@ -363,22 +372,6 @@ struct AIChatView: View {
     
     private func loadConfiguration() {
         aiService.updateConfiguration(apiKey: currentAPIKey, model: currentModel)
-        
-        // Update initial message if needed
-        if !messages.isEmpty && !messages[0].isFromUser {
-            let welcomeMessage: String
-            
-            if customPromptEnabled && !customPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                welcomeMessage = "Hello! I'm your AI assistant powered by \(currentModel.displayName). I'm configured with your custom instructions and ready to help you."
-            } else {
-                welcomeMessage = "Hello! I'm your AI language assistant powered by \(currentModel.displayName). I'm here to help you practice your language skills. What would you like to talk about?"
-            }
-            
-            messages[0] = ChatMessage(
-                content: welcomeMessage,
-                isFromUser: false
-            )
-        }
     }
 
     private func loadRecordingsFolders() {
@@ -423,10 +416,7 @@ struct AIChatView: View {
 
     private func loadTranscriptions(for folderName: String) {
         print("Loading transcriptions for folder: \(folderName)")
-        
-        // Очищаем предыдущие транскрипции на главном потоке
-        transcriptions = [:]
-        
+
         Task {
             guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path else {
                 print("Could not get documents directory")
@@ -434,28 +424,28 @@ struct AIChatView: View {
             }
             let folderPath = "\(documentsPath)/Recordings/\(folderName)"
             let fileManager = FileManager.default
-            
+
             var newTranscriptions: [String: String] = [:]
-            
+
             do {
                 print("Checking folder path: \(folderPath)")
-                
+
                 guard fileManager.fileExists(atPath: folderPath) else {
                     print("Folder does not exist: \(folderPath)")
                     return
                 }
-                
+
                 let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
                 print("Folder contents: \(folderContents)")
-                
+
                 for file in folderContents {
                     if file.hasSuffix(".json") && !file.contains("recording_info") {
                         let filePath = "\(folderPath)/\(file)"
-                        
+
                         do {
                             let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                            
+
                             // Обработка appleSpeechTranscriptions массива
                             if let appleSpeechTranscriptions = json?["appleSpeechTranscriptions"] as? [[String: Any]] {
                                 let transcriptions = appleSpeechTranscriptions.compactMap { item in
@@ -467,7 +457,7 @@ struct AIChatView: View {
                                     print("Found Apple Speech transcription in \(file): \(combinedTranscription.prefix(50))...")
                                 }
                             }
-                            
+
                             if let aiTranscription = json?["aiEnhancedTranscription"] as? String, !aiTranscription.isEmpty {
                                 newTranscriptions["AI Enhanced"] = aiTranscription
                                 print("Found AI Enhanced transcription in \(file): \(aiTranscription.prefix(50))...")
@@ -477,12 +467,10 @@ struct AIChatView: View {
                         }
                     }
                 }
-                
+
                 await MainActor.run {
-                    self.transcriptions = newTranscriptions
-                    print("Updated transcriptions: \(self.transcriptions.keys)")
                     if let transcription = newTranscriptions["AI Enhanced"] ?? newTranscriptions["Apple Speech"] {
-                        self.selectedTranscription = transcription
+                        self.transcriptions[folderName] = transcription
                     }
                 }
             } catch {
