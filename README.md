@@ -1,135 +1,123 @@
-# Audio Study - macOS Speech Recognition App
+# Audio Study: Your AI-Powered Language Learning & Transcription Companion for macOS
 
-**Приложение использует только Apple Speech для распознавания речи.** Архитектура была упрощена для сосредоточения на одном, надежном движке распознавания.
+**Transform your Mac into a sophisticated tool for language learning and audio transcription. Audio Study leverages Apple's powerful, on-device Speech Recognition and integrates state-of-the-art AI models to help you master new languages and transcribe audio with unparalleled accuracy.**
 
-## Особенности
+![Audio Study App Screenshot](https://user-images.githubusercontent.com/your-image-placeholder.png) 
+*A GIF or screenshot of the app in action would be great here!*
 
-- **Apple Speech Recognition** - встроенное распознавание речи macOS
-- **Многоязычная поддержка** - поддержка всех языков Apple Speech
-- **История транскрипций** - автоматическое сохранение всей истории
-- **Именованные записи** - сохранение записей с пользовательскими названиями
-- **Экспорт данных** - легкий доступ к JSON файлам транскрипций
-- **AI интеграция** - анализ транскрипций с помощью GLM-4
+---
 
-## Требования
+[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos)
+[![Swift Version](https://img.shields.io/badge/Swift-5.9-orange.svg)](https://swift.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-- macOS 11.0+
-- Xcode 13.0+
-- Swift 5.5+
-- Доступ к микрофону
+## 🚀 Why Audio Study?
 
-## Установка
+Audio Study is more than just a transcription tool. It's a comprehensive ecosystem designed for language learners, students, and professionals who need to work with spoken audio. It combines the best of Apple's native technologies with the power of modern AI, offering a unique, privacy-focused, and highly efficient experience.
 
-1. Клонируйте репозиторий:
-```bash
-git clone <repository-url>
-cd "Audio Study"
-```
+- **For Language Learners**: Practice pronunciation, get instant feedback, and build vocabulary lists from any audio source. Use the AI Chat to have conversations and get grammar corrections.
+- **For Students & Researchers**: Transcribe lectures, interviews, and research audio with high accuracy. Organize and analyze your transcriptions with AI-powered tools.
+- **For Professionals**: Quickly convert meetings, voice notes, and dictations into clean, searchable text.
 
-2. Откройте проект в Xcode:
-```bash
-open "Audio Study.xcodeproj"
-```
+## ✨ Key Features
 
-3. Запустите проект (⌘+R)
+- 🎙️ **High-Quality On-Device Transcription**: Utilizes **Apple's native Speech framework** for fast, accurate, and private audio-to-text conversion. No internet connection required for transcription.
+- 🌐 **Extensive Language Support**: Supports all languages and locales available through Apple Speech, making it a truly global tool.
+- 🧠 **AI-Powered Enhancement & Chat**:
+    - **Google Gemini 2.0 Flash**: Leverage Google's latest, powerful AI for advanced text analysis, summarization, and conversation.
+    - **Zhipu GLM-4-Flash**: Utilize a fast and efficient model for quick text processing tasks.
+    - **Free Tiers**: Both integrated AI models offer generous free tiers, making advanced AI accessible to everyone.
+- 📚 **Intelligent Word Sorter**: A unique tool for language learners that uses **Apple's Natural Language framework** to:
+    - **Lemmatize words** (e.g., "running", "ran" -> "run").
+    - Filter for meaningful vocabulary (nouns, verbs, adjectives).
+    - Categorize words into "Known" and "Unknown" lists to track your learning progress.
+- 🗂️ **Advanced Transcription Management**:
+    - **Session History**: Automatically saves all transcriptions.
+    - **Named Recordings**: Save and organize your sessions with custom titles.
+    - **AI Enhancement**: Clean up and correct transcription errors with a single click.
+    - **Export**: Easily export your data to JSON for use in other applications.
+- 🔒 **Privacy First**: All transcriptions and audio processing are done on-device. Your API keys are stored securely in the local keychain. Your data remains yours.
+- 💻 **Built with SwiftUI**: A modern, clean, and responsive user interface built entirely with SwiftUI.
 
-## Быстрый старт
+## 🛠️ Technology Stack
 
-1. **Проверьте разрешения микрофона**: Убедитесь, что приложение имеет разрешение на доступ к микрофону в System Preferences > Security & Privacy > Privacy > Microphone
+- **UI**: SwiftUI
+- **Core Logic**: Swift
+- **Speech Recognition**: Apple Speech Framework
+- **Natural Language Processing**: Apple Natural Language Framework
+- **AI Integration**: REST API integration with Google AI (Gemini) and Zhipu AI (GLM)
+- **Dependencies**: 100% native Apple frameworks. No external dependencies.
 
-2. **Выберите язык**: В настройках выберите нужный язык для распознавания речи Apple Speech
+## 🚀 Getting Started
 
-3. **Начните запись**: Нажмите "Start Capture" для начала записи и распознавания
+### Prerequisites
 
-## Структура проекта
+- macOS 13.0+
+- Xcode 15.0+
+- An Apple Developer account (for running on a device)
+
+### Installation & Running
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/Audio-Study.git
+    cd Audio-Study
+    ```
+
+2.  **Open the project in Xcode:**
+    ```bash
+    open "Audio Study.xcodeproj"
+    ```
+
+3.  **Configure Signing & Capabilities:**
+    - In Xcode, select the `Audio Study` project in the navigator.
+    - Go to the `Signing & Capabilities` tab.
+    - Select your developer team.
+
+4.  **Run the project:**
+    - Press `Cmd+R` to build and run the application on your Mac.
+
+### API Key Configuration
+
+To use the AI-powered features, you'll need to obtain free API keys from the respective providers.
+
+1.  **Navigate to Settings**: Open the app and go to the `Settings` (⚙️) tab.
+2.  **Select an AI Model**: Choose either `Gemini 2.0 Flash` or `GLM-4-Flash`.
+3.  **Get API Key**:
+    - For **Google Gemini**: Click the "Get API Key" link or visit [Google AI Studio](https://aistudio.google.com/app/apikey).
+    - For **Zhipu GLM**: Click the "Get API Key" link or visit [open.bigmodel.cn](https://open.bigmodel.cn/).
+4.  **Enter and Save**: Paste your API key into the input field and click "Save".
+
+## 📂 Project Structure
+
+The project is organized into a clean, modular structure to make it easy to navigate and contribute.
 
 ```
 Audio Study/
 ├── Audio Study/
-│   ├── Audio_StudyApp.swift         # Точка входа приложения
-│   ├── ContentView.swift            # Главное представление
-│   ├── Model/
-│   │   ├── AIModel.swift            # AI модели и конфигурация
-│   │   ├── AppError.swift           # Обработка ошибок
-│   │   ├── NavigationModel.swift    # Навигационная модель
-│   │   ├── SpeechEngineType.swift   # Типы движков распознавания
-│   │   └── TranscriptionModels.swift # Модели транскрипций
-│   ├── Service/
-│   │   ├── AudioCaptureService.swift          # Главный сервис аудиозахвата
-│   │   ├── GLMChatService.swift              # GLM AI интеграция
-│   │   ├── SpeechRecognizerService.swift     # Apple Speech интеграция
-│   │   ├── TranscriptionPersistenceService.swift # Сохранение данных
-│   │   └── UniversalAIChatService.swift      # Универсальный AI сервис
-│   └── View/
-│       ├── MainView.swift           # Главный интерфейс
-│       ├── AIChat/                  # AI чат функциональность
-│       ├── LearnWords/              # Изучение слов
-│       ├── Record/                  # Запись и транскрипция
-│       ├── Settings/                # Настройки
-│       ├── Shared/                  # Общие компоненты
-│       └── Transcriptions/          # Управление транскрипциями
+│   ├── Audio_StudyApp.swift         # App entry point
+│   ├── Model/                       # Data models (Transcription, AI, Navigation)
+│   ├── Service/                     # Business logic (Audio Capture, Speech Recognition, AI Services)
+│   └── View/                        # SwiftUI Views
+│       ├── MainView.swift           # Main navigation structure
+│       ├── Record/                  # Recording and transcription UI
+│       ├── Transcriptions/          # Saved recordings browser
+│       ├── WordSorter/              # Language learning word sorter UI
+│       ├── AIChat/                  # AI chat interface
+│       ├── Settings/                # App settings and API key configuration
+│       └── Shared/                  # Reusable UI components
 ```
 
-## Возможности
+## 🤝 Contributing
 
-### Apple Speech Recognition
-- Встроенный в macOS движок распознавания речи
-- Поддержка множества языков и локалей
-- Режим реального времени
-- Высокая точность для поддерживаемых языков
-- Не требует интернет-соединения после первоначальной настройки
+Contributions are welcome! Whether it's a bug report, a feature request, or a pull request, your input is valued. Please feel free to open an issue to discuss your ideas.
 
-### Транскрипции
-- **Сессионная история**: Показывает транскрипции текущей сессии записи
-- **Постоянная история**: Все транскрипции сохраняются в JSON файлы
-- **Именованные записи**: Сохранение записей с пользовательскими названиями
-- **Экспорт**: Легкий доступ к JSON файлам через Finder
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/YourFeature`).
+3.  Commit your changes (`git commit -m 'Add some feature'`).
+4.  Push to the branch (`git push origin feature/YourFeature`).
+5.  Open a Pull Request.
 
-### Интеграция с AI
-- GLM-4-Flash для быстрого анализа и обработки транскрипций
-- Gemini 2.0 Flash для продвинутого анализа с большим контекстом
-- Универсальный AI сервис для различных провайдеров
-- Изучение слов с помощью AI
+## 📄 License
 
-## Рекомендации по использованию
-
-### Настройки аудио
-- Для лучшего качества: используйте хороший USB микрофон
-- Для максимального качества: обеспечьте тихую среду без эха
-
-### Выбор языка
-- Выбирайте язык, соответствующий вашей речи
-- Apple Speech лучше всего работает с языками, для которых была обучена
-
-## Хранение данных
-
-Все транскрипции автоматически сохраняются в:
-- `~/Documents/apple_history.json` - общая история
-- `~/Documents/apple_history_session.json` - сессионная история
-- `~/Documents/Recordings/` - именованные записи
-
-## Устранение проблем
-
-### Проблемы с микрофоном
-1. Проверьте разрешения в System Preferences > Security & Privacy > Privacy > Microphone
-2. Убедитесь, что микрофон не используется другими приложениями
-3. Попробуйте переключить входное аудиоустройство в System Preferences > Sound > Input
-
-### Проблемы с распознаванием
-1. Убедитесь, что выбранный язык соответствует вашей речи
-2. Говорите четко и не слишком быстро
-3. Убедитесь в хорошем качестве звука (минимум шума)
-
-### Настройка AI Chat
-
-Для использования функции AI Chat вам понадобится API ключ от Zhipu AI:
-
-1. Зарегистрируйтесь на [https://open.bigmodel.cn/](https://open.bigmodel.cn/)
-2. Получите API ключ в разделе API Keys
-3. В приложении нажмите на иконку ключа (🔑) в AI Chat
-4. Введите ваш API ключ
-5. Начните общаться с ИИ!
-
-## Лицензия
-
-Этот проект использует MIT лицензию. См. файл LICENSE для подробностей.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
