@@ -174,29 +174,30 @@ struct AIChatView: View {
     }
     
     // MARK: - Messages View
-    @ViewBuilder
     private var messagesView: some View {
-        if messages.isEmpty {
-            emptyStateView
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(messages) { message in
-                            MessageBubbleView(message: message)
-                                .id(message.id)
+        Group {
+            if messages.isEmpty {
+                emptyStateView
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(messages) { message in
+                                MessageBubbleView(message: message)
+                                    .id(message.id)
+                            }
+                            
+                            if isLoading {
+                                loadingIndicator
+                            }
                         }
-                        
-                        if isLoading {
-                            loadingIndicator
-                        }
+                        .padding()
                     }
-                    .padding()
-                }
-                .onChange(of: messages.count) { _ in
-                    if let lastMessage = messages.last {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    .onChange(of: messages.count) { _ in
+                        if let lastMessage = messages.last {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
@@ -211,7 +212,7 @@ struct AIChatView: View {
                 .textFieldStyle(PlainTextFieldStyle())
                 .focused($isInputFocused)
                 .lineLimit(1...4)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 16) 
                 .padding(.vertical, 12)
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(20)

@@ -623,24 +623,15 @@ struct TranscriptionContentView: View {
                     // Обрабатываем весь текст за один раз
                     let rawEnhanced = try await processTranscriptionChunk(allTranscriptions)
                     
-                    // Для отладки: временно отключаем удаление дубликатов
-                    let shouldRemoveDuplicates = false // Изменить на true для включения удаления дубликатов
-                    enhancedText = shouldRemoveDuplicates ? removeDuplicateSegments(rawEnhanced) : rawEnhanced
+                    enhancedText = removeDuplicateSegments(rawEnhanced)
                     
-                    if !shouldRemoveDuplicates {
-                        print("⚠️  Duplicate removal is DISABLED for debugging")
-                    }
+
                 } else {
                     // Разбиваем на части и обрабатываем каждую
                     let rawEnhanced = try await processLargeTranscription(allTranscriptions, maxChunkSize: maxChunkSize, folderName: folderName)
                     
-                    // Для отладки: временно отключаем удаление дубликатов
-                    let shouldRemoveDuplicates = false // Изменить на true для включения удаления дубликатов
-                    enhancedText = shouldRemoveDuplicates ? removeDuplicateSegments(rawEnhanced) : rawEnhanced
-                    
-                    if !shouldRemoveDuplicates {
-                        print("⚠️  Duplicate removal is DISABLED for debugging")
-                    }
+                    enhancedText = removeDuplicateSegments(rawEnhanced)
+
                 }
                 
                 // Сохраняем AI Enhanced транскрипцию в JSON
