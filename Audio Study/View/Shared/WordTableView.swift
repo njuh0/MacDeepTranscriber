@@ -111,38 +111,15 @@ struct WordTableView: View {
     
     private func exportWords() {
         let savePanel = NSSavePanel()
-        savePanel.allowedContentTypes = [.plainText, .commaSeparatedText]
-        savePanel.nameFieldStringValue = "\(title.replacingOccurrences(of: " ", with: "_"))_words"
-        savePanel.message = "Choose location and format to save word list"
-        
-        // Add accessory view for format selection
-        let formatView = NSStackView()
-        formatView.orientation = .horizontal
-        formatView.spacing = 10
-        
-        let formatLabel = NSTextField(labelWithString: "Format:")
-        let formatPopup = NSPopUpButton()
-        formatPopup.addItems(withTitles: ["Plain Text (.txt)", "CSV (.csv)"])
-        
-        formatView.addArrangedSubview(formatLabel)
-        formatView.addArrangedSubview(formatPopup)
-        savePanel.accessoryView = formatView
-        
+        savePanel.allowedContentTypes = [.plainText]
+        savePanel.nameFieldStringValue = "\(title.replacingOccurrences(of: " ", with: "_"))_words.txt"
+        savePanel.message = "Choose location to save the word list"
+
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
-            
-            let selectedFormat = formatPopup.indexOfSelectedItem
-            let content: String
-            
-            switch selectedFormat {
-            case 0: // Plain text
-                content = words.joined(separator: "\n")
-            case 1: // CSV
-                content = "Word\n" + words.map { "\"\($0)\"" }.joined(separator: "\n")
-            default:
-                content = words.joined(separator: "\n")
-            }
-            
+
+            let content = words.joined(separator: "\n")
+
             do {
                 try content.write(to: url, atomically: true, encoding: .utf8)
                 print("Word list exported successfully to \(url.path)")
