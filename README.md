@@ -57,10 +57,8 @@ MacDeepTranscriber is built on Apple's native Speech Recognition framework, whic
 ## Getting Started
 
 ### Capturing system audio tutorial
- 
 
-https://github.com/user-attachments/assets/3204b9f3-988d-461d-90ec-2a7229d8f8bd
-
+https://github.com/user-attachments/assets/54104d92-9913-4a9c-aeb2-9acba56f0dbf
 
 
 
