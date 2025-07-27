@@ -668,32 +668,20 @@ struct TranscriptionContentView: View {
         print("Language will be auto-detected by AI model")
         
         let prompt = """
-        I have a speech recognition transcription that contains errors and needs cleaning. Please analyze the language and fix this transcription by:
+        Fix the following speech recognition transcription. Detect the language and apply corrections for that language:
 
-        1. Automatically detecting the language of the transcription
-        2. Correcting obvious spelling mistakes and typos in that language
-        3. Fixing punctuation, capitalization, and spacing according to language rules
-        4. Removing duplicate sentences, paragraphs or phrases that appear to be recognition errors
-        5. Completing cut-off words or sentences that end abruptly
-        6. Ensuring proper sentence structure and natural flow for the detected language
-        7. Fixing names and technical terms that were misrecognized
-        8. Adding missing punctuation marks appropriate for the language
-        9. Keeping ALL the original unique content - do not summarize or shorten
+        - Correct spelling mistakes and typos
+        - Fix punctuation, capitalization, and spacing
+        - Remove duplicates and repetitive phrases
+        - Complete cut-off words and sentences
+        - Ensure proper sentence structure and flow
+        - Fix misrecognized names and technical terms
+        - Add missing punctuation marks
+        - Keep all original unique content
 
-        IMPORTANT: 
-        - First detect the language, then apply language-specific corrections
-        - Return the complete cleaned transcription without duplications
-        - Maintain all the original unique information and meaning
-        - If text is repeated multiple times, keep only one clean version
-        - Complete any sentences that end abruptly or are cut off
-        - Ensure natural language flow according to the detected language's grammar rules
-        - Preserve the original language - do not translate
-
-        Here is the transcription to clean:
+        Return ONLY the corrected transcription without any explanations or comments:
 
         \(text)
-
-        Please provide the complete cleaned transcription in the same language:
         """
        
         
@@ -868,32 +856,20 @@ struct TranscriptionContentView: View {
             }
             
             let prompt = """
-            I have part \(index + 1) of \(chunks.count) of a speech transcription. Please make corrections for errors while preserving the original meaning and language.
+            Part \(index + 1) of \(chunks.count). Fix errors while preserving meaning and language:
 
-            Please:
-            1. Automatically detect the language of this text part
-            2. Fix clear spelling mistakes and typos in that language
-            3. Correct missing spaces between words  
-            4. Remove obvious duplicate words or phrases that are recognition errors
-            5. Add basic punctuation where clearly missing according to language rules
-            6. Complete cut-off words or incomplete sentences
-            7. Fix names and technical terms that were misrecognized
+            - Detect language and fix spelling/typos
+            - Correct missing spaces between words
+            - Remove duplicate words/phrases from recognition errors
+            - Add missing punctuation
+            - Complete cut-off words and sentences
+            - Fix misrecognized names and technical terms
 
-            IMPORTANT RULES:
-            - Keep the original content, meaning, and language intact
-            - Do NOT translate to another language
-            - Do NOT rephrase or rewrite in your own words
-            - Do NOT change the speaking style or add explanations
-            - Do NOT summarize or shorten the content
-            - If this part seems to repeat content from previous parts, still process it (duplicates will be handled separately)
-            - Complete any sentences that end abruptly
-            - Apply language-specific grammar and punctuation rules
+            Keep original content, meaning, and language intact. Do NOT translate, rephrase, or summarize.
 
-            Original part \(index + 1)/\(chunks.count):
+            Return ONLY the corrected text:
 
             \(chunk)
-
-            Corrected version (same language):
             """
             
             // Convert history to AI service format
