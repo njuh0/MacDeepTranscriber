@@ -1,25 +1,39 @@
-# MacDeepTranscriber: Your AI-Powered Language Learning & Transcription Companion for macOS
+# MacDeepTranscriber
 
 **MacDeepTranscriber is a powerful and efficient tool that turns your Mac into a smart audio processing station. Transcribe lectures, online content, or your own voice, and then use integrated AI to analyze, clean, and learn from the text.**
 
----
+# Why it exists
+I enjoy listening to audiobooks and learning languages. Occasionally, I miss a word or struggle to understand it. MacDeepTranscriber runs in the background while I listen to an audiobook or watch a video, allowing me to quickly check unfamiliar words or phrases.
 
-## What Can You Do with MacDeepTranscriber?
-
-MacDeepTranscriber is designed for a wide range of use cases, from language learning to professional work.
-
-- **Transcribe Anything**: 
-  - **Online Content**: Capture and transcribe audio from YouTube, podcasts, and audiobooks.
-  - **Live Conversations**: Record and analyze discussions from Discord, Zoom, or any other live audio source.
+## Record
+- **Transcribe Anything**:
+  - **Audiobooks & Online Content**: Capture and transcribe audio from YouTube, podcasts, and audiobooks.
+  - **Live Conversations**: Record and analyze discussions from Discord, Zoom, or any other live audio source. (Sadly most likely you will not be able to use your microphone at the same time and record system audio. You will need to change the primary microphone every time in Audio MIDI Setup app)
   - **Lectures & Meetings**: Record in-person lectures or meetings and get a full text transcript for later analysis.
+  - **Analyze Your Speech**: Record your own voice to get a transcript and identify areas for improvement. (Not advance, only words)
 
-- **AI-Powered Text Analysis**:
+  - **Extensive Language Support**: Transcribe over 50 languages and dialects supported by Apple Speech.
+
+https://github.com/user-attachments/assets/35da1b69-17ff-4cbc-891e-19734247aa15
+
+## Enhance Transcriptions 
   - **Enhance Transcriptions**: Use AI to automatically correct errors, fix punctuation, and remove repetitive phrases from your raw transcriptions.
+
+https://github.com/user-attachments/assets/7047bee2-bd02-4bc9-b4bc-731733e1dd99
+
+## Word Sorter. Language Learning
+  - **Filter & Export Vocabulary**: Use the Word Sorter to isolate words you don't know from any transcription and export them for study in apps like Anki or Quizlet.
+  - **Correct**: The text can be corrected manually in the recording file.
+  - **Word Sorter**: An intelligent tool that uses Apple's Natural Language framework to lemmatize words (e.g., "running" -> "run") and help you build vocabulary lists.
+
+
+https://github.com/user-attachments/assets/3cbf8f57-dc66-4c82-a6d0-747ed7aa5797
+
+## AI Chat & Settings
   - **Analyze Content**: Chat with an AI about your transcribed text to get summaries, ask questions, or gain deeper insights.
 
-- **Language Learning**:
-  - **Analyze Your Speech**: Record your own voice (e.g., in a Discord call) to get a transcript and identify areas for improvement.
-  - **Filter & Export Vocabulary**: Use the Word Sorter to isolate words you don't know from any transcription and export them for study in apps like Anki or Quizlet.
+https://github.com/user-attachments/assets/6677ca6c-5274-40c9-bf47-fb295fff0e5f
+
 
 ## Key Features
 
@@ -27,10 +41,9 @@ MacDeepTranscriber is designed for a wide range of use cases, from language lear
 - **System Audio Capture**: With the help of [BlackHole](https://github.com/ExistentialAudio/BlackHole), a free virtual audio driver, you can capture any audio playing on your Mac. You can also record directly from your microphone without it.
 - **Extensive Language Support**: Transcribe over 50 languages and dialects supported by Apple Speech.
 - **Integrated AI Models**: 
-  - **Google Gemini 2.0 Flash**: For top-tier analysis and transcription enhancement.
-  - **Zhipu GLM-4-Flash**: A fast and efficient alternative for quick tasks.
-- **Word Sorter**: An intelligent tool that uses Apple's Natural Language framework to lemmatize words (e.g., "running" -> "run") and help you build vocabulary lists.
-- **Privacy-Focused**: Your audio, transcriptions, and API keys are all processed and stored locally on your device.
+  - **Google Gemini 2.5 Flash**: For top-tier analysis and transcription enhancement. FREE DAILY REQUESTS
+  - **Zhipu GLM-4-Flash**: A fast and efficient alternative for quick tasks. FREE DAILY REQUESTS
+- **Privacy**: Your audio, and API keys are all processed and stored locally on your device. But transcripted text is sent to remote server if you enhance it or use AI Chat
 
 ## The Power of Native Apple Speech
 
@@ -43,6 +56,10 @@ MacDeepTranscriber is built on Apple's native Speech Recognition framework, whic
 
 ## Getting Started
 
+### Capturing system audio tutorial
+
+
+
 ### Prerequisites
 
 - macOS 13.0+
@@ -53,8 +70,8 @@ MacDeepTranscriber is built on Apple's native Speech Recognition framework, whic
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/Audio-Study.git
-    cd Audio-Study
+    git clone https://github.com/njuh0/MacDeepTranscriber.git
+    cd MacDeepTranscriber
     ```
 
 2.  **Open in Xcode:**
@@ -64,9 +81,7 @@ MacDeepTranscriber is built on Apple's native Speech Recognition framework, whic
 
 3.  **Run the app:** Press `Cmd+R`.
 
-## Contributing
-
-Contributions are welcome! Please feel free to open an issue or submit a pull request.
+The easiest project in my life. The app was created 90% with the help of Claude Sonnet 4 Agent
 
 ## License
 
