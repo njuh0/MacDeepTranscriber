@@ -71,6 +71,7 @@ https://github.com/user-attachments/assets/54104d92-9913-4a9c-aeb2-9acba56f0dbf
 
 ### Privacy
 Apple's own Speech framework only works through a microphone. Even if you use BlackHole and want to record system audio, it requires access to a microphone (MacOS doesn't allow you to directly record system audio, the only option I found was to use BlackHole).
+
 <img width="287" height="347" alt="Screen Shot 2025-07-27 at 18 53 18 PM" src="https://github.com/user-attachments/assets/5098815b-f4f2-4ade-880b-7f30ac3b1878" />
 <img width="289" height="281" alt="Screen Shot 2025-07-27 at 18 53 32 PM" src="https://github.com/user-attachments/assets/83149578-3dcb-42ff-9468-0a1ad15a4ad4" />
 
