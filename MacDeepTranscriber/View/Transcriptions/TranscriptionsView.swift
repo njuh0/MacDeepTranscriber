@@ -24,7 +24,7 @@ private func getMaxOutputTokens(for model: AIModel) -> Int {
     case .glm4Flash:
         return 4095
     case .gemini2Flash:
-        return 8192
+        return 16384 // Увеличиваем лимит для Gemini 2.5 Flash из-за thinking tokens
     }
 }
 
@@ -34,7 +34,7 @@ private func getMaxChunkSize(for model: AIModel) -> Int {
     case .glm4Flash:
         return 16_000 // 16k characters for GLM-4-Flash
     case .gemini2Flash:
-        return 32_000 // 32k characters for Gemini 2.0 Flash (much larger capacity)
+        return 32_000 // 32k characters for Gemini 2.5 Flash (much larger capacity)
     }
 }
 
@@ -623,12 +623,26 @@ struct TranscriptionContentView: View {
                     // Process entire text at once
                     let rawEnhanced = try await processTranscriptionChunk(allTranscriptions)
                     
+                    print("=== Raw AI Response Debug ===")
+                    print("Raw enhanced length: \(rawEnhanced.count) characters")
+                    print("Raw enhanced preview: \(rawEnhanced.prefix(200))...")
+                    print("Raw enhanced is empty: \(rawEnhanced.isEmpty)")
+                    print("Raw enhanced trimmed length: \(rawEnhanced.trimmingCharacters(in: .whitespacesAndNewlines).count)")
+                    print("=============================")
+                    
                     enhancedText = removeDuplicateSegments(rawEnhanced)
                     
 
                 } else {
                     // Split into parts and process each
                     let rawEnhanced = try await processLargeTranscription(allTranscriptions, maxChunkSize: maxChunkSize, folderName: folderName)
+                    
+                    print("=== Raw AI Response Debug (Large) ===")
+                    print("Raw enhanced length: \(rawEnhanced.count) characters")
+                    print("Raw enhanced preview: \(rawEnhanced.prefix(200))...")
+                    print("Raw enhanced is empty: \(rawEnhanced.isEmpty)")
+                    print("Raw enhanced trimmed length: \(rawEnhanced.trimmingCharacters(in: .whitespacesAndNewlines).count)")
+                    print("=====================================")
                     
                     enhancedText = removeDuplicateSegments(rawEnhanced)
 
@@ -668,18 +682,16 @@ struct TranscriptionContentView: View {
         print("Language will be auto-detected by AI model")
         
         let prompt = """
-        Fix the following speech recognition transcription. Detect the language and apply corrections for that language:
+        You are a transcription corrector. Fix this speech-to-text output by correcting obvious errors while preserving all original content and meaning.
 
-        - Correct spelling mistakes and typos
-        - Fix punctuation, capitalization, and spacing
-        - Remove duplicates and repetitive phrases
+        Tasks:
+        - Fix spelling mistakes and typos
+        - Add proper punctuation and capitalization  
+        - Remove duplicate words/phrases from recognition errors
         - Complete cut-off words and sentences
-        - Ensure proper sentence structure and flow
         - Fix misrecognized names and technical terms
-        - Add missing punctuation marks
-        - Keep all original unique content
 
-        Return ONLY the corrected transcription without any explanations or comments:
+        IMPORTANT: Work efficiently without extensive analysis. Return ONLY the corrected text:
 
         \(text)
         """

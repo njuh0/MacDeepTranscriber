@@ -10,7 +10,7 @@ import Foundation
 // MARK: - AI Model Types
 enum AIModel: String, CaseIterable, Identifiable {
     case glm4Flash = "glm-4-flash"
-    case gemini2Flash = "gemini-2.0-flash-exp"
+    case gemini2Flash = "gemini-2.5-flash"
     
     var id: String { rawValue }
     
@@ -19,7 +19,7 @@ enum AIModel: String, CaseIterable, Identifiable {
         case .glm4Flash:
             return "GLM-4-Flash"
         case .gemini2Flash:
-            return "Gemini 2.0 Flash"
+            return "Gemini 2.5 Flash"
         }
     }
     

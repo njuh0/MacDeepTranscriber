@@ -13,7 +13,7 @@ private func getMaxOutputTokens(for model: AIModel) -> Int {
     case .glm4Flash:
         return 4095
     case .gemini2Flash:
-        return 8192
+        return 16384 // Увеличиваем лимит для Gemini 2.5 Flash из-за thinking tokens
     }
 }
 
@@ -195,6 +195,14 @@ class UniversalAIChatService: ObservableObject {
             throw AIError.invalidURL
         }
         
+        // Debug: Log request details
+        print("=== Gemini API Request Debug ===")
+        print("URL: \(url)")
+        print("Model: \(model.rawValue)")
+        print("Contents count: \(contents.count)")
+        print("System instruction: \(systemInstruction.prefix(100))...")
+        print("================================")
+        
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -203,24 +211,63 @@ class UniversalAIChatService: ObservableObject {
             let requestData = try JSONEncoder().encode(request)
             urlRequest.httpBody = requestData
             
+            // Debug: Log request size
+            print("Request body size: \(requestData.count) bytes")
+            if let requestString = String(data: requestData, encoding: .utf8) {
+                print("Request body preview: \(requestString.prefix(300))...")
+            }
+            
             let (data, response) = try await session.data(for: urlRequest)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AIError.invalidResponse
             }
             
+            // Debug: Log response details
+            print("=== Gemini API Response Debug ===")
+            print("Status Code: \(httpResponse.statusCode)")
+            print("Response Headers: \(httpResponse.allHeaderFields)")
+            print("Response Data Size: \(data.count) bytes")
+            
+            // Log raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Raw Response: \(responseString.prefix(500))...")
+            }
+            print("===================================")
+            
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw AIError.invalidAPIKey
             }
             
             guard httpResponse.statusCode == 200 else {
+                print("API Error - Status: \(httpResponse.statusCode)")
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("Error Response: \(errorString)")
+                }
                 throw AIError.apiError(httpResponse.statusCode)
             }
             
             let chatResponse = try JSONDecoder().decode(GeminiChatResponse.self, from: data)
             
+            // Debug: Log parsed response
+            print("=== Gemini Response Parsed ===")
+            print("Candidates count: \(chatResponse.candidates.count)")
+            if let firstCandidate = chatResponse.candidates.first {
+                print("First candidate parts count: \(firstCandidate.content.parts.count)")
+                if let firstPart = firstCandidate.content.parts.first {
+                    print("First part text length: \(firstPart.text.count)")
+                    print("First part text preview: \(firstPart.text.prefix(200))...")
+                } else {
+                    print("No parts found in first candidate")
+                }
+            } else {
+                print("No candidates found in response")
+            }
+            print("===============================")
+            
             guard let firstCandidate = chatResponse.candidates.first,
                   let firstPart = firstCandidate.content.parts.first else {
+                print("Error: No response content found")
                 throw AIError.noResponse
             }
             
