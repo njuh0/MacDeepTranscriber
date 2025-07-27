@@ -57,7 +57,8 @@ MacDeepTranscriber is built on Apple's native Speech Recognition framework, whic
 ## Getting Started
 
 ### Capturing system audio tutorial
-
+1. Download BlackHole for MacOS
+2. Setup via Audio MIDI Setup.app
 https://github.com/user-attachments/assets/54104d92-9913-4a9c-aeb2-9acba56f0dbf
 
 
