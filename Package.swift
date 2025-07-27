@@ -4,22 +4,26 @@
 import PackageDescription
 
 let package = Package(
-    name: "AudioStudy",
+    name: "MacDeepTranscriber",
     platforms: [
         .macOS(.v13),
         .iOS(.v16)
     ],
     products: [
-        .executable(name: "AudioStudy", targets: ["AudioStudy"])
+        .executable(name: "MacDeepTranscriber", targets: ["MacDeepTranscriber"])
     ],
     dependencies: [
         // No external dependencies - using Apple Speech only
     ],
     targets: [
         .executableTarget(
-            name: "AudioStudy",
+            name: "MacDeepTranscriber",
             dependencies: [],
-            path: "Audio Study"
+            path: "MacDeepTranscriber",
+            resources: [
+                .process("Assets.xcassets"),
+                .copy("MacDeepTranscriber.entitlements")
+            ]
         )
     ]
 )

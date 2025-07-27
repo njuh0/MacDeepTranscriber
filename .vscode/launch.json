@@ -4,19 +4,19 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:Audio Study}",
-            "name": "Debug AudioStudy",
-            "program": "${workspaceFolder:Audio Study}/.build/debug/AudioStudy",
-            "preLaunchTask": "swift: Build Debug AudioStudy"
+            "cwd": "${workspaceFolder:MacDeepTranscriber}",
+            "name": "Debug MacDeepTranscriber",
+            "program": "${workspaceFolder:MacDeepTranscriber}/.build/debug/MacDeepTranscriber",
+            "preLaunchTask": "swift: Build Debug MacDeepTranscriber"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:Audio Study}",
-            "name": "Release AudioStudy",
-            "program": "${workspaceFolder:Audio Study}/.build/release/AudioStudy",
-            "preLaunchTask": "swift: Build Release AudioStudy"
+            "cwd": "${workspaceFolder:MacDeepTranscriber}",
+            "name": "Release MacDeepTranscriber",
+            "program": "${workspaceFolder:MacDeepTranscriber}/.build/release/MacDeepTranscriber",
+            "preLaunchTask": "swift: Build Release MacDeepTranscriber"
         }
     ]
 }
