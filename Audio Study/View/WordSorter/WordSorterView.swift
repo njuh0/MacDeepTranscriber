@@ -18,16 +18,16 @@ struct WordSorterView: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            // Основное содержимое
+            // Main content
             VStack(spacing: 20) {
                 if let selectedFolder = selectedFolder {
-                    // Показываем выбранную запись для сортировки слов
+                    // Show selected recording for word sorting
                     WordSorterContentView(
                         folderName: selectedFolder,
                         transcriptions: transcriptions
                     )
                 } else {
-                    // Placeholder когда ничего не выбрано
+                    // Placeholder when nothing is selected
                     Text("Word Sorter")
                         .font(.largeTitle)
                         .fontWeight(.bold)
@@ -40,7 +40,7 @@ struct WordSorterView: View {
                         
                         Spacer()
                         
-                        // Placeholder content для пустого состояния
+                        // Placeholder content for empty state
                         VStack(spacing: 16) {
                             Image(systemName: "book.circle.fill")
                                 .font(.system(size: 60))
@@ -87,7 +87,7 @@ struct WordSorterView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(NSColor.controlBackgroundColor))
             
-            // Сайдбар справа
+            // Right sidebar
             if showSidebar && !recordingsFolders.isEmpty {
                 WordSorterRightSidebarView(
                     recordingsFolders: recordingsFolders,
@@ -134,7 +134,7 @@ struct WordSorterView: View {
     private func loadTranscriptions(for folderName: String) {
         print("Loading transcriptions for folder: \(folderName)")
         
-        // Очищаем предыдущие транскрипции на главном потоке
+        // Clear previous transcriptions on main thread
         transcriptions = [:]
         
         Task {
@@ -166,7 +166,7 @@ struct WordSorterView: View {
                             let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                             
-                            // Обработка appleSpeechTranscriptions массива
+                            // Processing appleSpeechTranscriptions array
                             if let appleSpeechTranscriptions = json?["appleSpeechTranscriptions"] as? [[String: Any]] {
                                 let transcriptions = appleSpeechTranscriptions.compactMap { item in
                                     return item["transcription"] as? String
@@ -221,7 +221,7 @@ struct WordSorterView: View {
                     var isDirectory: ObjCBool = false
                     
                     if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory) && isDirectory.boolValue {
-                        // Проверяем, есть ли JSON файлы в папке
+                        // Check if there are JSON files in the folder
                         let folderContents = try fileManager.contentsOfDirectory(atPath: itemPath)
                         if folderContents.contains(where: { $0.hasSuffix(".json") }) {
                             foldersWithJSON.append(item)
@@ -247,7 +247,7 @@ struct WordSorterRightSidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             
-            // Заголовок записей
+            // Recordings header
             if !recordingsFolders.isEmpty {
                 Divider()
                 
@@ -257,7 +257,7 @@ struct WordSorterRightSidebarView: View {
                     .padding(.top, 15)
                     .padding(.bottom, 10)
                 
-                // Список папок с записями
+                // List of recording folders
                 List(recordingsFolders, id: \.self) { folder in
                     HStack {
                         Image(systemName: "book.closed")
@@ -301,18 +301,18 @@ struct WordSorterContentView: View {
     let folderName: String
     let transcriptions: [String: String]
     
-    // Сохраняемые данные
+    // Saved data
     @AppStorage("knownWords") private var knownWordsData: String = ""
     @AppStorage("unknownWords") private var unknownWordsData: String = ""
     @AppStorage("useLemmatization") private var useLemmatization: Bool = true
     @AppStorage("useEnhancedTranscription") private var useEnhancedTranscription: Bool = true
     
-    // Состояние для таблиц
+    // State for tables
     @State private var knownWords: Set<String> = []
     @State private var unknownWords: Set<String> = []
     @State private var draggedWord: String? = nil
     
-    // Получаем выбранную транскрипцию
+    // Get selected transcription
     private var selectedTranscription: String {
         if useEnhancedTranscription && transcriptions["AI Enhanced"] != nil {
             return transcriptions["AI Enhanced"] ?? ""
@@ -321,22 +321,22 @@ struct WordSorterContentView: View {
         }
     }
     
-    // Слова из текущей транскрипции, которых нет в других таблицах
+    // Words from current transcription that are not in other tables
     private var currentTranscriptionWords: [String] {
         guard !selectedTranscription.isEmpty else { return [] }
         
-        // Получаем слова из выбранной транскрипции
+        // Get words from selected transcription
         let words = useLemmatization ? extractAndLemmatizeWords(from: selectedTranscription) : extractSimpleWords(from: selectedTranscription)
         
         let uniqueWords = Set(words)
         
-        // Возвращаем только те слова, которых нет в знакомых и незнакомых
+        // Return only words that are not in known and unknown
         return Array(uniqueWords.subtracting(knownWords).subtracting(unknownWords)).sorted()
     }
     
     var body: some View {
         VStack(spacing: 20) {
-            // Заголовок
+            // Header
             HStack {
                 Text(folderName)
                     .font(.largeTitle)
@@ -362,13 +362,13 @@ struct WordSorterContentView: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Три таблицы
+                // Three tables
                 VStack(spacing: 12) {
                     
                     HStack(alignment: .top, spacing: 16) {
-                    // Левая таблица - Знакомые слова
+                    // Left table - Known words
                     VStack(spacing: 8) {
-                        // Пустое пространство для выравнивания с центральной таблицей
+                        // Empty space for alignment with center table
                         Color.clear
                             .frame(height: 20)
                         
@@ -384,9 +384,9 @@ struct WordSorterContentView: View {
                         )
                     }
                     
-                    // Средняя таблица - Слова из текущей транскрипции
+                    // Center table - Words from current transcription
                     VStack(spacing: 8) {
-                        // Переключатель лемматизации над таблицей
+                        // Lemmatization toggle above the table
                         HStack(spacing: 8) {
                             Toggle("Smart processing", isOn: $useLemmatization)
                                 .toggleStyle(.switch)
@@ -398,7 +398,7 @@ struct WordSorterContentView: View {
                                 .help("When enabled, converts words to their base form (e.g., 'running' → 'run', 'better' → 'good') and filters only meaningful words: nouns, verbs, adjectives, and adverbs")
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .frame(height: 20) // Фиксированная высота для выравнивания
+                        .frame(height: 20) // Fixed height for alignment
                         
                         WordTableView(
                             title: "Current Recording",
@@ -412,9 +412,9 @@ struct WordSorterContentView: View {
                         )
                     }
                     
-                    // Правая таблица - Незнакомые слова
+                    // Right table - Unknown words
                     VStack(spacing: 8) {
-                        // Пустое пространство для выравнивания с центральной таблицей
+                        // Empty space for alignment with center table
                         Color.clear
                             .frame(height: 20)
                         
@@ -449,12 +449,12 @@ struct WordSorterContentView: View {
     // MARK: - Data Management
     
     private func loadSavedWords() {
-        // Загружаем знакомые слова
+        // Load known words
         if !knownWordsData.isEmpty {
             knownWords = Set(knownWordsData.components(separatedBy: ","))
         }
         
-        // Загружаем незнакомые слова
+        // Load unknown words
         if !unknownWordsData.isEmpty {
             unknownWords = Set(unknownWordsData.components(separatedBy: ","))
         }
@@ -480,8 +480,8 @@ struct WordSorterContentView: View {
     }
     
     private func moveWordToCurrent(_ word: String) {
-        // Просто удаляем из других таблиц, независимо от того, есть ли слово в текущей транскрипции
-        // Слово появится в currentTranscriptionWords только если оно действительно есть в транскрипции
+        // Simply remove from other tables, regardless of whether word is in current transcription
+        // Word will appear in currentTranscriptionWords only if it's actually in the transcription
         knownWords.remove(word)
         unknownWords.remove(word)
         saveWords()
@@ -501,24 +501,24 @@ struct WordSorterContentView: View {
         tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { tokenRange, _ in
             let word = String(text[tokenRange])
             
-            // Базовая очистка
+            // Basic cleanup
             let cleanWord = word
                 .trimmingCharacters(in: .punctuationCharacters)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
             
-            // Проверяем базовые условия
+            // Check basic conditions
             guard cleanWord.count >= 3,
                   !cleanWord.isEmpty,
                   !cleanWord.allSatisfy(\.isNumber) else {
                 return true
             }
             
-            // Проверяем, что это действительно слово (не пунктуация, числа и т.д.)
+            // Check that this is actually a word (not punctuation, numbers, etc.)
             let lexicalClassResult = tagger.tag(at: tokenRange.lowerBound, unit: .word, scheme: .lexicalClass)
             let lexicalClass = lexicalClassResult.0
             
-            // Фильтруем только существительные, глаголы, прилагательные и наречия
+            // Filter only nouns, verbs, adjectives and adverbs
             guard let tagValue = lexicalClass?.rawValue,
                   ["Noun", "Verb", "Adjective", "Adverb"].contains(tagValue) else {
                 return true

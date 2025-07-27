@@ -1,135 +1,135 @@
 # Audio Study - macOS Speech Recognition App
 
-**Приложение использует только Apple Speech для распознавания речи.** Архитектура была упрощена для сосредоточения на одном, надежном движке распознавания.
+**The application uses only Apple Speech for speech recognition.** The architecture has been simplified to focus on one reliable recognition engine.
 
-## Особенности
+## Features
 
-- **Apple Speech Recognition** - встроенное распознавание речи macOS
-- **Многоязычная поддержка** - поддержка всех языков Apple Speech
-- **История транскрипций** - автоматическое сохранение всей истории
-- **Именованные записи** - сохранение записей с пользовательскими названиями
-- **Экспорт данных** - легкий доступ к JSON файлам транскрипций
-- **AI интеграция** - анализ транскрипций с помощью GLM-4
+- **Apple Speech Recognition** - built-in macOS speech recognition
+- **Multilingual support** - support for all Apple Speech languages
+- **Transcription history** - automatic saving of all history
+- **Named recordings** - save recordings with custom names
+- **Data export** - easy access to transcription JSON files
+- **AI integration** - transcription analysis using GLM-4
 
-## Требования
+## Requirements
 
 - macOS 11.0+
 - Xcode 13.0+
 - Swift 5.5+
-- Доступ к микрофону
+- Microphone access
 
-## Установка
+## Installation
 
-1. Клонируйте репозиторий:
+1. Clone the repository:
 ```bash
 git clone <repository-url>
 cd "Audio Study"
 ```
 
-2. Откройте проект в Xcode:
+2. Open the project in Xcode:
 ```bash
 open "Audio Study.xcodeproj"
 ```
 
-3. Запустите проект (⌘+R)
+3. Run the project (⌘+R)
 
-## Быстрый старт
+## Quick Start
 
-1. **Проверьте разрешения микрофона**: Убедитесь, что приложение имеет разрешение на доступ к микрофону в System Preferences > Security & Privacy > Privacy > Microphone
+1. **Check microphone permissions**: Make sure the app has permission to access the microphone in System Preferences > Security & Privacy > Privacy > Microphone
 
-2. **Выберите язык**: В настройках выберите нужный язык для распознавания речи Apple Speech
+2. **Select language**: In settings, choose the desired language for Apple Speech recognition
 
-3. **Начните запись**: Нажмите "Start Capture" для начала записи и распознавания
+3. **Start recording**: Click "Start Capture" to begin recording and recognition
 
-## Структура проекта
+## Project Structure
 
 ```
 Audio Study/
 ├── Audio Study/
-│   ├── Audio_StudyApp.swift         # Точка входа приложения
-│   ├── ContentView.swift            # Главное представление
+│   ├── Audio_StudyApp.swift         # Application entry point
+│   ├── ContentView.swift            # Main view
 │   ├── Model/
-│   │   ├── AIModel.swift            # AI модели и конфигурация
-│   │   ├── AppError.swift           # Обработка ошибок
-│   │   ├── NavigationModel.swift    # Навигационная модель
-│   │   ├── SpeechEngineType.swift   # Типы движков распознавания
-│   │   └── TranscriptionModels.swift # Модели транскрипций
+│   │   ├── AIModel.swift            # AI models and configuration
+│   │   ├── AppError.swift           # Error handling
+│   │   ├── NavigationModel.swift    # Navigation model
+│   │   ├── SpeechEngineType.swift   # Recognition engine types
+│   │   └── TranscriptionModels.swift # Transcription models
 │   ├── Service/
-│   │   ├── AudioCaptureService.swift          # Главный сервис аудиозахвата
-│   │   ├── GLMChatService.swift              # GLM AI интеграция
-│   │   ├── SpeechRecognizerService.swift     # Apple Speech интеграция
-│   │   ├── TranscriptionPersistenceService.swift # Сохранение данных
-│   │   └── UniversalAIChatService.swift      # Универсальный AI сервис
+│   │   ├── AudioCaptureService.swift          # Main audio capture service
+│   │   ├── GLMChatService.swift              # GLM AI integration
+│   │   ├── SpeechRecognizerService.swift     # Apple Speech integration
+│   │   ├── TranscriptionPersistenceService.swift # Data persistence
+│   │   └── UniversalAIChatService.swift      # Universal AI service
 │   └── View/
-│       ├── MainView.swift           # Главный интерфейс
-│       ├── AIChat/                  # AI чат функциональность
-│       ├── LearnWords/              # Изучение слов
-│       ├── Record/                  # Запись и транскрипция
-│       ├── Settings/                # Настройки
-│       ├── Shared/                  # Общие компоненты
-│       └── Transcriptions/          # Управление транскрипциями
+│       ├── MainView.swift           # Main interface
+│       ├── AIChat/                  # AI chat functionality
+│       ├── LearnWords/              # Word learning
+│       ├── Record/                  # Recording and transcription
+│       ├── Settings/                # Settings
+│       ├── Shared/                  # Common components
+│       └── Transcriptions/          # Transcription management
 ```
 
-## Возможности
+## Features
 
 ### Apple Speech Recognition
-- Встроенный в macOS движок распознавания речи
-- Поддержка множества языков и локалей
-- Режим реального времени
-- Высокая точность для поддерживаемых языков
-- Не требует интернет-соединения после первоначальной настройки
+- Built-in macOS speech recognition engine
+- Support for multiple languages and locales
+- Real-time mode
+- High accuracy for supported languages
+- No internet connection required after initial setup
 
-### Транскрипции
-- **Сессионная история**: Показывает транскрипции текущей сессии записи
-- **Постоянная история**: Все транскрипции сохраняются в JSON файлы
-- **Именованные записи**: Сохранение записей с пользовательскими названиями
-- **Экспорт**: Легкий доступ к JSON файлам через Finder
+### Transcriptions
+- **Session history**: Shows transcriptions from current recording session
+- **Persistent history**: All transcriptions saved to JSON files
+- **Named recordings**: Save recordings with custom names
+- **Export**: Easy access to JSON files through Finder
 
-### Интеграция с AI
-- GLM-4-Flash для быстрого анализа и обработки транскрипций
-- Gemini 2.0 Flash для продвинутого анализа с большим контекстом
-- Универсальный AI сервис для различных провайдеров
-- Изучение слов с помощью AI
+### AI Integration
+- GLM-4-Flash for fast transcription analysis and processing
+- Gemini 2.0 Flash for advanced analysis with large context
+- Universal AI service for various providers
+- AI-powered word learning
 
-## Рекомендации по использованию
+## Usage Recommendations
 
-### Настройки аудио
-- Для лучшего качества: используйте хороший USB микрофон
-- Для максимального качества: обеспечьте тихую среду без эха
+### Audio Settings
+- For better quality: use a good USB microphone
+- For maximum quality: ensure a quiet environment without echo
 
-### Выбор языка
-- Выбирайте язык, соответствующий вашей речи
-- Apple Speech лучше всего работает с языками, для которых была обучена
+### Language Selection
+- Choose the language that matches your speech
+- Apple Speech works best with languages it was trained for
 
-## Хранение данных
+## Data Storage
 
-Все транскрипции автоматически сохраняются в:
-- `~/Documents/apple_history.json` - общая история
-- `~/Documents/apple_history_session.json` - сессионная история
-- `~/Documents/Recordings/` - именованные записи
+All transcriptions are automatically saved to:
+- `~/Documents/apple_history.json` - general history
+- `~/Documents/apple_history_session.json` - session history
+- `~/Documents/Recordings/` - named recordings
 
-## Устранение проблем
+## Troubleshooting
 
-### Проблемы с микрофоном
-1. Проверьте разрешения в System Preferences > Security & Privacy > Privacy > Microphone
-2. Убедитесь, что микрофон не используется другими приложениями
-3. Попробуйте переключить входное аудиоустройство в System Preferences > Sound > Input
+### Microphone Issues
+1. Check permissions in System Preferences > Security & Privacy > Privacy > Microphone
+2. Ensure the microphone is not being used by other applications
+3. Try switching the input audio device in System Preferences > Sound > Input
 
-### Проблемы с распознаванием
-1. Убедитесь, что выбранный язык соответствует вашей речи
-2. Говорите четко и не слишком быстро
-3. Убедитесь в хорошем качестве звука (минимум шума)
+### Recognition Issues
+1. Make sure the selected language matches your speech
+2. Speak clearly and not too fast
+3. Ensure good audio quality (minimal noise)
 
-### Настройка AI Chat
+### AI Chat Setup
 
-Для использования функции AI Chat вам понадобится API ключ от Zhipu AI:
+To use the AI Chat feature, you'll need an API key from Zhipu AI:
 
-1. Зарегистрируйтесь на [https://open.bigmodel.cn/](https://open.bigmodel.cn/)
-2. Получите API ключ в разделе API Keys
-3. В приложении нажмите на иконку ключа (🔑) в AI Chat
-4. Введите ваш API ключ
-5. Начните общаться с ИИ!
+1. Register at [https://open.bigmodel.cn/](https://open.bigmodel.cn/)
+2. Get an API key in the API Keys section
+3. In the app, click the key icon (🔑) in AI Chat
+4. Enter your API key
+5. Start chatting with AI!
 
-## Лицензия
+## License
 
-Этот проект использует MIT лицензию. См. файл LICENSE для подробностей.
+This project uses the MIT license. See the LICENSE file for details.

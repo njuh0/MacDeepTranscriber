@@ -19,7 +19,7 @@ struct WordTableView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Заголовок таблицы
+            // Table header
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
@@ -49,7 +49,7 @@ struct WordTableView: View {
             Divider()
                 .background(color.opacity(0.5))
             
-            // Список слов
+            // Word list
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(words, id: \.self) { word in

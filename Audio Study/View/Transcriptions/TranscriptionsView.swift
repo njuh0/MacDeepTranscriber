@@ -40,17 +40,17 @@ private func getMaxChunkSize(for model: AIModel) -> Int {
 
 struct TranscriptionsView: View {
     @ObservedObject var audioCaptureService: AudioCaptureService
-    @State private var showSidebar = true // Изначально открыт
+    @State private var showSidebar = true // Initially open
     @State private var recordingsFolders: [String] = []
     @State private var selectedFolder: String? = nil
     @State private var transcriptions: [String: String] = [:] // engine: transcription
     
     var body: some View {
         HStack(spacing: 0) {
-            // Основное содержимое
+            // Main content
             VStack(spacing: 20) {
                 if let selectedFolder = selectedFolder {
-                    // Показываем выбранную транскрипцию
+                    // Show selected transcription
                     TranscriptionContentView(
                         folderName: selectedFolder,
                         transcriptions: transcriptions,
@@ -60,7 +60,7 @@ struct TranscriptionsView: View {
                         }
                     )
                 } else {
-                    // Placeholder когда ничего не выбрано
+                    // Placeholder when nothing is selected
                     Text("Transcriptions")
                         .font(.largeTitle)
                         .fontWeight(.bold)
@@ -73,7 +73,7 @@ struct TranscriptionsView: View {
                         
                         Spacer()
                         
-                        // Placeholder content для пустого состояния
+                        // Placeholder content for empty state
                         VStack(spacing: 16) {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 60))
@@ -120,7 +120,7 @@ struct TranscriptionsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(NSColor.controlBackgroundColor))
             
-            // Сайдбар справа
+            // Right sidebar
             if showSidebar && !recordingsFolders.isEmpty {
                 RightSidebarView(
                     audioCaptureService: audioCaptureService,
@@ -177,11 +177,11 @@ struct TranscriptionsView: View {
             
             do {
                 if engine == "Apple Speech" {
-                    // Если удаляем Apple Speech, удаляем всю папку независимо от AI Enhanced
+                    // If removing Apple Speech, delete entire folder regardless of AI Enhanced
                     try fileManager.removeItem(atPath: folderPath)
                     print("Deleted entire folder \(folderPath) after removing Apple Speech transcription")
                     
-                    // Обновляем UI на главном потоке
+                    // Update UI on main thread
                     await MainActor.run {
                         let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
                         if let index = self.recordingsFolders.firstIndex(of: folderName) {
@@ -191,7 +191,7 @@ struct TranscriptionsView: View {
                         self.transcriptions = [:]
                     }
                 } else {
-                    // Для AI Enhanced удаляем только этот ключ из JSON
+                    // For AI Enhanced, only remove this key from JSON
                     let folderContents = try fileManager.contentsOfDirectory(atPath: folderPath)
                     
                     for file in folderContents {
@@ -208,7 +208,7 @@ struct TranscriptionsView: View {
                                     
                                     print("Deleted AI Enhanced transcription from \(file)")
                                     
-                                    // Обновляем UI на главном потоке
+                                    // Update UI on main thread
                                     await MainActor.run {
                                         var updatedTranscriptions = self.transcriptions
                                         updatedTranscriptions.removeValue(forKey: "AI Enhanced")
@@ -229,7 +229,7 @@ struct TranscriptionsView: View {
     private func loadTranscriptions(for folderName: String) {
         print("Loading transcriptions for folder: \(folderName)")
         
-        // Очищаем предыдущие транскрипции на главном потоке
+        // Clear previous transcriptions on main thread
         transcriptions = [:]
         
         Task {
@@ -293,7 +293,7 @@ struct TranscriptionsView: View {
                 
                 print("Total transcriptions loaded: \(newTranscriptions.count)")
                 
-                // Обновляем UI на главном потоке
+                // Update UI on main thread
                 await MainActor.run {
                     self.transcriptions = newTranscriptions
                 }
@@ -329,7 +329,7 @@ struct TranscriptionsView: View {
                     var isDirectory: ObjCBool = false
                     
                     if fileManager.fileExists(atPath: itemPath, isDirectory: &isDirectory) && isDirectory.boolValue {
-                        // Проверяем, есть ли JSON файлы в папке
+                        // Check if there are JSON files in the folder
                         let folderContents = try fileManager.contentsOfDirectory(atPath: itemPath)
                         if folderContents.contains(where: { $0.hasSuffix(".json") }) {
                             foldersWithJSON.append(item)
@@ -356,7 +356,7 @@ struct RightSidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             
-            // Заголовок записей
+            // Recordings header
             if !recordingsFolders.isEmpty {
                 Divider()
                 
@@ -366,7 +366,7 @@ struct RightSidebarView: View {
                     .padding(.top, 15)
                     .padding(.bottom, 10)
                 
-                // Список папок с записями
+                // List of recording folders
                 List(recordingsFolders, id: \.self) { folder in
                     HStack {
                         Image(systemName: "doc.text")
@@ -436,7 +436,7 @@ struct TranscriptionContentView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Заголовок с названием записи и кнопкой AI Enhancement
+            // Header with recording name and AI Enhancement button
             HStack {
                 Text(folderName)
                     .font(.largeTitle)
@@ -444,10 +444,10 @@ struct TranscriptionContentView: View {
                 
                 Spacer()
                 
-                // Показываем кнопку только если есть оригинальные транскрипции (не AI Enhanced)
+                // Show button only if there are original transcriptions (not AI Enhanced)
                 if !transcriptions.isEmpty && !transcriptions.keys.contains("AI Enhanced") {
                     VStack(alignment: .trailing, spacing: 4) {
-                        // Отображение текущей модели
+                        // Display current model
                         Text("Model: \(currentModel.displayName)")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -478,12 +478,12 @@ struct TranscriptionContentView: View {
                     }
                 } else if transcriptions.keys.contains("AI Enhanced") {
                     VStack(alignment: .trailing, spacing: 4) {
-                        // Отображение текущей модели
+                        // Display current model
                         Text("Model: \(currentModel.displayName)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        // Кнопка для повторного улучшения
+                        // Button for re-enhancement
                         Button(action: {
                             enhanceTranscription()
                         }) {
@@ -513,7 +513,7 @@ struct TranscriptionContentView: View {
             .padding(.top)
             
             if transcriptions.isEmpty {
-                // Загрузка
+                // Loading
                 VStack(spacing: 16) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
@@ -601,18 +601,18 @@ struct TranscriptionContentView: View {
         
         Task {
             do {
-                // Настраиваем AI сервис с выбранной моделью и ключом
+                // Configure AI service with selected model and key
                 print("Configuring AI service with model: \(currentModel.displayName)")
                 aiService.updateConfiguration(apiKey: currentAPIKey, model: currentModel)
                 
-                // Создаем prompt для AI, исключая AI Enhanced из исходных данных
+                // Create AI prompt, excluding AI Enhanced from source data
                 let originalTranscriptions = transcriptions.filter { $0.key != "AI Enhanced" }
                 let allTranscriptions = originalTranscriptions.map { engine, text in
                     "=== \(engine) ===\n\(text)"
                 }.joined(separator: "\n\n")
                 
-                // Проверяем длину текста и разбиваем на части если нужно
-                let maxChunkSize = getMaxChunkSize(for: currentModel) // Размер чанка зависит от модели
+                // Check text length and split into parts if needed
+                let maxChunkSize = getMaxChunkSize(for: currentModel) // Chunk size depends on model
                 
                 print("Text length: \(allTranscriptions.count) characters, Max chunk size: \(maxChunkSize) characters")
                 print("Will use \(allTranscriptions.count <= maxChunkSize ? "single chunk" : "multiple chunks") processing")
@@ -620,21 +620,21 @@ struct TranscriptionContentView: View {
                 let enhancedText: String
                 
                 if allTranscriptions.count <= maxChunkSize {
-                    // Обрабатываем весь текст за один раз
+                    // Process entire text at once
                     let rawEnhanced = try await processTranscriptionChunk(allTranscriptions)
                     
                     enhancedText = removeDuplicateSegments(rawEnhanced)
                     
 
                 } else {
-                    // Разбиваем на части и обрабатываем каждую
+                    // Split into parts and process each
                     let rawEnhanced = try await processLargeTranscription(allTranscriptions, maxChunkSize: maxChunkSize, folderName: folderName)
                     
                     enhancedText = removeDuplicateSegments(rawEnhanced)
 
                 }
                 
-                // Сохраняем AI Enhanced транскрипцию в JSON
+                // Save AI Enhanced transcription to JSON
                 await saveAIEnhancedTranscription(enhancedText)
                 
                 print("=== AI Enhancement Completed ===")
@@ -715,7 +715,7 @@ struct TranscriptionContentView: View {
         print("Language will be auto-detected by AI model for each chunk")
         print("Starting conversation with empty history (isolated per recording)")
         
-        // Более умное разбиение на равные части с поиском границ
+        // Smarter splitting into equal parts with boundary detection
         var chunks: [String] = []
         
         if text.count <= maxChunkSize {
@@ -727,30 +727,30 @@ struct TranscriptionContentView: View {
                 let remainingText = String(text[text.index(text.startIndex, offsetBy: currentIndex)...])
                 
                 if remainingText.count <= maxChunkSize {
-                    // Последний кусок
+                    // Last chunk
                     chunks.append(remainingText.trimmingCharacters(in: .whitespacesAndNewlines))
                     break
                 }
                 
-                // Целевая длина чанка
+                // Target chunk length
                 let targetChunkSize = maxChunkSize
-                let minChunkSize = maxChunkSize / 2  // Минимальный размер чанка
+                let minChunkSize = maxChunkSize / 2  // Minimum chunk size
                 
-                // Ищем границу в диапазоне от середины до максимального размера
+                // Look for boundary in range from middle to maximum size
                 let searchStart = max(minChunkSize, targetChunkSize / 2)
                 let searchEnd = min(targetChunkSize + 200, remainingText.count)
                 
                 var bestCutPoint = min(targetChunkSize, remainingText.count)
                 
-                // Ищем лучшую точку разделения в порядке приоритета
+                // Look for best split point in order of priority
                 for i in stride(from: searchEnd, to: searchStart, by: -1) {
                     if i >= remainingText.count { continue }
                     
                     let char = remainingText[remainingText.index(remainingText.startIndex, offsetBy: i)]
                     
-                    // 1. Конец предложения (наивысший приоритет)
+                    // 1. End of sentence (highest priority)
                     if char == "." || char == "!" || char == "?" {
-                        // Проверяем, что после знака есть пробел или конец строки
+                        // Check that there's a space or end of line after the punctuation
                         if i + 1 < remainingText.count {
                             let nextChar = remainingText[remainingText.index(remainingText.startIndex, offsetBy: i + 1)]
                             if nextChar == " " || nextChar == "\n" {
@@ -762,21 +762,21 @@ struct TranscriptionContentView: View {
                             break
                         }
                     }
-                    // 2. Новая строка (высокий приоритет)
+                    // 2. New line (high priority)
                     else if char == "\n" {
                         bestCutPoint = i + 1
                         break
                     }
                 }
                 
-                // Если не нашли хорошую границу предложения, ищем знаки препинания
+                // If we didn't find a good sentence boundary, look for punctuation
                 if bestCutPoint == min(targetChunkSize, remainingText.count) {
                     for i in stride(from: searchEnd, to: searchStart, by: -1) {
                         if i >= remainingText.count { continue }
                         
                         let char = remainingText[remainingText.index(remainingText.startIndex, offsetBy: i)]
                         
-                        // 3. Запятая или точка с запятой
+                        // 3. Comma or semicolon
                         if char == "," || char == ";" {
                             if i + 1 < remainingText.count {
                                 let nextChar = remainingText[remainingText.index(remainingText.startIndex, offsetBy: i + 1)]
@@ -789,14 +789,14 @@ struct TranscriptionContentView: View {
                     }
                 }
                 
-                // Если и это не сработало, ищем любой пробел
+                // If that didn't work either, look for any space
                 if bestCutPoint == min(targetChunkSize, remainingText.count) {
                     for i in stride(from: searchEnd, to: searchStart, by: -1) {
                         if i >= remainingText.count { continue }
                         
                         let char = remainingText[remainingText.index(remainingText.startIndex, offsetBy: i)]
                         
-                        // 4. Любой пробел
+                        // 4. Any whitespace
                         if char == " " {
                             bestCutPoint = i + 1
                             break
@@ -804,7 +804,7 @@ struct TranscriptionContentView: View {
                     }
                 }
                 
-                // Берем кусок до найденной точки разреза
+                // Take the chunk up to the found cut point
                 bestCutPoint = min(bestCutPoint, remainingText.count)
                 let chunk = String(remainingText.prefix(bestCutPoint)).trimmingCharacters(in: .whitespacesAndNewlines)
                 chunks.append(chunk)
@@ -815,12 +815,12 @@ struct TranscriptionContentView: View {
         
         print("Processing \(chunks.count) chunks for large transcription (sizes: \(chunks.map { $0.count }))")
         
-        // Обрабатываем каждую часть с сохранением контекста
+        // Process each part while preserving context
         var enhancedChunks: [String] = []
         var conversationHistory: [(String, String)] = [] // (user_message, ai_response)
         
         for (index, chunk) in chunks.enumerated() {
-            // Подсчитываем приблизительное количество токенов в истории
+            // Calculate approximate token count in history
             let historyTokens = estimateTokenCountForHistory(conversationHistory)
             let currentChunkTokens = estimateTokenCount(chunk)
             let promptTokens = estimateTokenCount("""
@@ -849,7 +849,7 @@ struct TranscriptionContentView: View {
             let totalRequestTokens = historyTokens + currentChunkTokens + promptTokens
             let contextUsagePercent = min(100, Int(Double(totalRequestTokens) / Double(maxContextTokens) * 100))
             
-            // Создаем визуальный индикатор заполненности
+            // Create visual fullness indicator
             let barLength = 20
             let filledLength = Int(Double(barLength) * Double(contextUsagePercent) / 100.0)
             let emptyLength = barLength - filledLength
@@ -896,7 +896,7 @@ struct TranscriptionContentView: View {
             Corrected version (same language):
             """
             
-            // Преобразуем историю в формат для AI сервиса
+            // Convert history to AI service format
             var chatHistory = conversationHistory.flatMap { userMsg, aiResponse in
                 [
                     ChatMessage(content: userMsg, isFromUser: true),
@@ -904,9 +904,9 @@ struct TranscriptionContentView: View {
                 ]
             }
             
-            // Если контекстное окно переполнено, сокращаем историю
+            // If context window is overflowing, reduce history
             if contextUsagePercent >= 90 {
-                let maxHistoryMessages = max(2, chatHistory.count / 2) // Оставляем минимум 2 сообщения
+                let maxHistoryMessages = max(2, chatHistory.count / 2) // Keep minimum 2 messages
                 chatHistory = Array(chatHistory.suffix(maxHistoryMessages))
                 let reducedTokens = estimateTokenCountForHistory(conversationHistory.suffix(maxHistoryMessages / 2))
                 print("[Session \(sessionId)] 🔄 Context window at \(contextUsagePercent)%, reducing history to \(maxHistoryMessages) messages (~\(reducedTokens) tokens)")
@@ -918,24 +918,24 @@ struct TranscriptionContentView: View {
             let cleanedChunk = enhancedChunk.trimmingCharacters(in: .whitespacesAndNewlines)
             enhancedChunks.append(cleanedChunk)
             
-            // Добавляем текущий запрос и ответ в историю для следующего чанка
+            // Add current request and response to history for next chunk
             conversationHistory.append((prompt, cleanedChunk))
             
             print("[Session \(sessionId)] Chunk \(index + 1) processed. Enhanced length: \(cleanedChunk.count) characters")
             print("[Session \(sessionId)] Total conversation history: \(conversationHistory.count) interactions")
             
-            // Небольшая пауза между запросами
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 секунды
+            // Small pause between requests
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         }
         
-        // Объединяем обработанные части с пробелом, убирая лишние пробелы
+        // Combine processed parts with space, removing extra spaces
         let result = enhancedChunks.joined(separator: " ")
         let finalResult = result.replacingOccurrences(of: "  ", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         
         let maxHistoryTokens = estimateTokenCountForHistory(conversationHistory)
         let maxContextUsagePercent = min(100, Int(Double(maxHistoryTokens) / Double(maxContextTokens) * 100))
         
-        // Создаем визуальный индикатор максимального использования контекста
+        // Create visual indicator of maximum context usage
         let barLength = 20
         let filledLength = Int(Double(barLength) * Double(maxContextUsagePercent) / 100.0)
         let emptyLength = barLength - filledLength
@@ -968,7 +968,7 @@ struct TranscriptionContentView: View {
                     let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                     
                     if var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        // Добавляем или обновляем AI Enhanced транскрипцию
+                        // Add or update AI Enhanced transcription
                         json["aiEnhancedTranscription"] = enhancedText
                         
                         let updatedData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
@@ -976,7 +976,7 @@ struct TranscriptionContentView: View {
                         
                         print("Saved AI Enhanced transcription to \(file)")
                         
-                        // Обновляем UI на главном потоке
+                        // Update UI on main thread
                         await MainActor.run {
                             var updatedTranscriptions = self.transcriptions
                             updatedTranscriptions["AI Enhanced"] = enhancedText
@@ -1017,7 +1017,7 @@ struct TranscriptionContentView: View {
                                 
                                 print("Deleted AI Enhanced transcription from \(file)")
                                 
-                                // Обновляем UI на главном потоке
+                                // Update UI on main thread
                                 await MainActor.run {
                                     var updatedTranscriptions = self.transcriptions
                                     updatedTranscriptions.removeValue(forKey: "AI Enhanced")
@@ -1037,9 +1037,9 @@ struct TranscriptionContentView: View {
     // MARK: - Language Detection Helper
     
     private func detectLanguage(in text: String) -> String {
-        let sampleText = text.prefix(200) // Первые 200 символов для определения
+        let sampleText = text.prefix(200) // First 200 characters for detection
         
-        // Проверяем различные языки
+        // Check various languages
         if sampleText.range(of: "[а-яёі]", options: [.regularExpression, .caseInsensitive]) != nil {
             return "Cyrillic (Russian/Ukrainian/etc.)"
         } else if sampleText.range(of: "[\\u4e00-\\u9fff\\u3040-\\u309f\\u30a0-\\u30ff]", options: [.regularExpression]) != nil {

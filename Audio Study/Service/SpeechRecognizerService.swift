@@ -15,8 +15,8 @@ class SpeechRecognizerService: ObservableObject {
     // Temporary storage during recording session
     private var permanentHistory: [TranscriptionEntry] = []
     
-    private var previousRecognizedText: String = "" // Для отслеживания изменений
-    private var significantChangeThreshold: Int = 5 // Минимальная разница в символах для сохранения
+    private var previousRecognizedText: String = "" // For tracking changes
+    private var significantChangeThreshold: Int = 5 // Minimum character difference for saving
 
     // For handling continuous recognition
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -233,7 +233,7 @@ class SpeechRecognizerService: ObservableObject {
                     if(text.isEmpty){
                         print("No recognized text")
                     }
-                    // Проверяем и сохраняем значительные изменения
+                    // Check and save significant changes
                     self.checkAndSaveSignificantChange(newText: text)
                     self.recognizedText = text
                 }
@@ -378,19 +378,19 @@ class SpeechRecognizerService: ObservableObject {
         return sessionTranscriptions.map { $0.transcription }.joined(separator: "\n")
     }
     
-    // Функция для расчета схожести двух текстов
+    // Function to calculate similarity between two texts
     private func calculateTextSimilarity(_ text1: String, _ text2: String) -> Double {
-        // Если один из текстов пустой, возвращаем 0
+        // If one of the texts is empty, return 0
         if text1.isEmpty || text2.isEmpty {
             return 0.0
         }
         
-        // Если тексты идентичны, возвращаем 1
+        // If texts are identical, return 1
         if text1 == text2 {
             return 1.0
         }
         
-        // Простой алгоритм - проверяем содержание одного текста в другом
+        // Simple algorithm - check if one text contains the other
         if text1.count > text2.count {
             if text1.contains(text2) {
                 return Double(text2.count) / Double(text1.count)
@@ -401,7 +401,7 @@ class SpeechRecognizerService: ObservableObject {
             }
         }
         
-        // Более продвинутая проверка - считаем общие слова
+        // More advanced check - count common words
         let words1 = Set(text1.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
         let words2 = Set(text2.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty })
         

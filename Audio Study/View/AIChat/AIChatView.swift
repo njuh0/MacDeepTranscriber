@@ -473,7 +473,7 @@ struct AIChatView: View {
                             let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
                             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-                            // Обработка appleSpeechTranscriptions массива
+                            // Process appleSpeechTranscriptions array
                             if let appleSpeechTranscriptions = json?["appleSpeechTranscriptions"] as? [[String: Any]] {
                                 let transcriptions = appleSpeechTranscriptions.compactMap { item in
                                     return item["transcription"] as? String
@@ -534,7 +534,7 @@ struct MessageBubbleView: View {
                         .background(message.isFromUser ? Color.blue : Color.gray.opacity(0.1))
                         .foregroundColor(message.isFromUser ? .white : .primary)
                         .cornerRadius(16)
-                        .textSelection(.enabled) // Позволяет выделять текст
+                        .textSelection(.enabled) // Allows text selection
                     
                     if message.isFromUser {
                         copyButton

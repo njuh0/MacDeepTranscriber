@@ -1,41 +1,41 @@
 # View Structure Organization
 
-После реорганизации файлы представлений (View) теперь организованы по функциональным группам:
+After reorganization, the View files are now organized by functional groups:
 
 ## 📁 Audio Study/View/
 
 ### 🎙️ Record/
-Файлы, относящиеся к записи звука и транскрипции:
-- `RecordView.swift` - основной экран записи
-- `ControlsView.swift` - элементы управления записью
-- `TranscriptionOutputView.swift` - отображение результатов транскрипции
-- `TranscriptionHistoryView.swift` - история транскрипций
+Files related to audio recording and transcription:
+- `RecordView.swift` - main recording screen
+- `ControlsView.swift` - recording control elements
+- `TranscriptionOutputView.swift` - transcription results display
+- `TranscriptionHistoryView.swift` - transcription history
 
 ### 📚 LearnWords/
-Файлы для изучения слов:
-- `LearnWordsView.swift` - основной экран изучения слов
+Files for word learning:
+- `LearnWordsView.swift` - main word learning screen
 
 ### 🤖 AIChat/
-Файлы для чата с ИИ:
-- `AIChatView.swift` - основной экран чата с ИИ
+Files for AI chat:
+- `AIChatView.swift` - main AI chat screen
 
 ### ⚙️ Settings/
-Файлы настроек:
-- `SettingsView.swift` - основной экран настроек
-- `LanguageSelectionView.swift` - выбор языка для Apple Speech
+Settings files:
+- `SettingsView.swift` - main settings screen
+- `LanguageSelectionView.swift` - language selection for Apple Speech
 
 ### 🔄 Shared/
-Общие компоненты, используемые в разных экранах:
-- `ErrorBannerView.swift` - баннер ошибок
+Common components used across different screens:
+- `ErrorBannerView.swift` - error banner
 
-### 🏠 Корневые файлы
-- `MainView.swift` - главное окно с навигацией
+### 🏠 Root files
+- `MainView.swift` - main window with navigation
 
-## Преимущества новой структуры:
+## Advantages of the new structure:
 
-1. **Логическая группировка** - файлы сгруппированы по функциональности
-2. **Легкая навигация** - проще найти нужный файл
-3. **Масштабируемость** - легко добавлять новые файлы в соответствующие папки
-4. **Командная работа** - разные разработчики могут работать с разными модулями
-5. **Поддержка** - проще локализовать изменения и исправления
+1. **Logical grouping** - files are grouped by functionality
+2. **Easy navigation** - easier to find the needed file
+3. **Scalability** - easy to add new files to appropriate folders
+4. **Team collaboration** - different developers can work with different modules
+5. **Maintenance** - easier to localize changes and fixes
 

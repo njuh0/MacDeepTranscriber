@@ -279,19 +279,19 @@ enum AIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "API ключ не установлен. Пожалуйста, настройте API ключ в Settings."
+            return "API key not set. Please configure API key in Settings."
         case .invalidURL:
-            return "Неверный URL API"
+            return "Invalid API URL"
         case .invalidResponse:
-            return "Неверный ответ от сервера"
+            return "Invalid server response"
         case .invalidAPIKey:
-            return "Неверный API ключ. Проверьте правильность ключа в Settings."
+            return "Invalid API key. Please check your key in Settings."
         case .apiError(let code):
-            return "Ошибка API: \(code)"
+            return "API error: \(code)"
         case .noResponse:
-            return "Пустой ответ от AI"
+            return "Empty response from AI"
         case .networkError(let message):
-            return "Ошибка сети: \(message)"
+            return "Network error: \(message)"
         }
     }
 }

@@ -18,7 +18,7 @@ struct SettingsView: View {
     @State private var tempAPIKey: String = ""
     @State private var showingAPIKeyField: Bool = false
     @State private var showingSaveConfirmation: Bool = false
-    @State private var isAPIKeyVisible: Bool = false // Новое состояние для показа/скрытия ключа
+    @State private var isAPIKeyVisible: Bool = false // New state for showing/hiding API key
     
     private var currentModel: AIModel {
         AIModel(rawValue: selectedModel) ?? .glm4Flash
@@ -380,7 +380,7 @@ struct SettingsView: View {
     private func loadSettings() {
         tempAPIKey = getCurrentAPIKey()
         showingAPIKeyField = currentModel.requiresAPIKey
-        isAPIKeyVisible = false // Сбрасываем видимость для безопасности
+        isAPIKeyVisible = false // Reset visibility for security
     }
     
     private func selectModel(_ model: AIModel) {
@@ -392,7 +392,7 @@ struct SettingsView: View {
         
         // Load the appropriate API key for the selected model
         tempAPIKey = getCurrentAPIKey()
-        isAPIKeyVisible = false // Сбрасываем видимость при смене модели
+        isAPIKeyVisible = false // Reset visibility when changing models
     }
     
     private func saveAPIKey() {

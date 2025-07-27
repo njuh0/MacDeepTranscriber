@@ -1,76 +1,76 @@
 # AI Models Optimization - Audio Study
 
-## 🎯 Цель оптимизации
-Упрощение кодовой базы путем сокращения количества поддерживаемых AI моделей с 4 до 2 наиболее эффективных.
+## 🎯 Optimization Goal
+Simplifying the codebase by reducing the number of supported AI models from 4 to 2 most efficient ones.
 
-## ✂️ Удаленные модели
-- **GLM-4** - заменен на GLM-4-Flash (более быстрая версия)
-- **ChatGLM3-6B** - устаревшая модель, менее эффективная
+## ✂️ Removed Models
+- **GLM-4** - replaced with GLM-4-Flash (faster version)
+- **ChatGLM3-6B** - outdated model, less efficient
 
-## ✅ Оставшиеся модели
+## ✅ Remaining Models
 1. **GLM-4-Flash** ⚡
-   - Провайдер: Zhipu AI (智谱AI)
-   - Скорость: Очень высокая
-   - Контекст: 8,192 токенов
-   - Макс. вывод: 4,095 токенов
-   - Бесплатный план: 1M токенов/месяц
+   - Provider: Zhipu AI (智谱AI)
+   - Speed: Very high
+   - Context: 8,192 tokens
+   - Max output: 4,095 tokens
+   - Free plan: 1M tokens/month
 
 2. **Gemini 2.0 Flash** 🚀
-   - Провайдер: Google AI
-   - Скорость: Очень высокая
-   - Контекст: 1,000,000 токенов
-   - Макс. вывод: 8,192 токенов
-   - Бесплатный план: 1,500 запросов/день
+   - Provider: Google AI
+   - Speed: Very high
+   - Context: 1,000,000 tokens
+   - Max output: 8,192 tokens
+   - Free plan: 1,500 requests/day
 
-## 🔧 Технические изменения
+## 🔧 Technical Changes
 
-### Файлы изменены:
-- `AIModel.swift` - убраны лишние enum cases
-- `UniversalAIChatService.swift` - упрощены функции лимитов
-- `GLMChatService.swift` - упрощены функции лимитов
-- `TranscriptionsView.swift` - оптимизированы функции лимитов и логирования
-- Документация (README.md, AI_SETTINGS_GUIDE.md, GEMINI_INTEGRATION.md)
+### Files modified:
+- `AIModel.swift` - removed extra enum cases
+- `UniversalAIChatService.swift` - simplified limit functions
+- `GLMChatService.swift` - simplified limit functions
+- `TranscriptionsView.swift` - optimized limit functions and logging
+- Documentation (README.md, AI_SETTINGS_GUIDE.md, GEMINI_INTEGRATION.md)
 
-### Упрощенные функции:
+### Simplified functions:
 ```swift
-// Было:
+// Before:
 switch model.displayName {
     case "GLM-4": return 4095
     case "GLM-4-Flash": return 4095  
     case "ChatGLM3-6B": return 4095
     case "Gemini 2.0 Flash": return 8192
-    default: // сложная логика fallback
+    default: // complex fallback logic
 }
 
-// Стало:
+// After:
 switch model {
     case .glm4Flash: return 4095
     case .gemini2Flash: return 8192
 }
 ```
 
-## 📊 Преимущества оптимизации
+## 📊 Optimization Benefits
 
-1. **Упрощение кода**: Меньше условий и веток
-2. **Легче поддержка**: Фокус на 2 лучших моделях
-3. **Быстрее разработка**: Меньше тестовых сценариев
-4. **Лучший UX**: Пользователи выбирают из лучших вариантов
-5. **Актуальность**: Только современные модели
+1. **Code simplification**: Fewer conditions and branches
+2. **Easier maintenance**: Focus on 2 best models
+3. **Faster development**: Fewer test scenarios
+4. **Better UX**: Users choose from the best options
+5. **Relevance**: Only modern models
 
-## 🎯 Рекомендации по использованию
+## 🎯 Usage Recommendations
 
-### Для пользователей:
-- **GLM-4-Flash**: Для быстрой обработки коротких текстов
-- **Gemini 2.0 Flash**: Для сложных задач с большими текстами
+### For users:
+- **GLM-4-Flash**: For fast processing of short texts
+- **Gemini 2.0 Flash**: For complex tasks with large texts
 
-### Для разработчиков:
-- При добавлении новых моделей добавляйте их в enum `AIModel`
-- Обновляйте функции лимитов для каждой новой модели
-- Документируйте возможности и ограничения в README
+### For developers:
+- When adding new models, add them to the `AIModel` enum
+- Update limit functions for each new model
+- Document capabilities and limitations in README
 
-## 🔄 Миграция для пользователей
-Пользователи, которые использовали удаленные модели:
-- GLM-4 → автоматически переключится на GLM-4-Flash
-- ChatGLM3-6B → автоматически переключится на GLM-4-Flash
+## 🔄 Migration for users
+Users who used removed models:
+- GLM-4 → will automatically switch to GLM-4-Flash
+- ChatGLM3-6B → will automatically switch to GLM-4-Flash
 
-Настройки API ключей остаются неизменными.
+API key settings remain unchanged.
