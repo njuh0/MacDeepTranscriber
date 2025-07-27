@@ -1,6 +1,6 @@
 //
 //  NavigationModel.swift
-//  Audio Study
+//  MacDeepTranscriber
 //
 //  Created on 20.06.2025.
 //

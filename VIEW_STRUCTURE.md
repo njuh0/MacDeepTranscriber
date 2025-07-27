@@ -2,7 +2,7 @@
 
 After reorganization, the View files are now organized by functional groups:
 
-## 📁 Audio Study/View/
+## 📁 MacDeepTranscriber/View/
 
 ### 🎙️ Record/
 Files related to audio recording and transcription:

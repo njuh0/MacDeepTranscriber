@@ -1,6 +1,6 @@
 //
 //  MainView.swift
-//  Audio Study
+//  MacDeepTranscriber
 //
 //  Created on 20.06.2025.
 //
@@ -46,7 +46,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .navigationTitle("Audio Study")
+        .navigationTitle("MacDeepTranscriber")
         .listStyle(SidebarListStyle())
     }
 }
@@ -85,7 +85,7 @@ struct WelcomeView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.accentColor)
             
-            Text("Welcome to Audio Study")
+            Text("Welcome to MacDeepTranscriber")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             

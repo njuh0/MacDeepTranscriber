@@ -2,7 +2,7 @@
 
 ## Overview
 
-WordSorterView is a sophisticated word sorting interface for the Audio Study app that helps users categorize words from audio transcriptions into three categories: "I Know", "Current Recording", and "Don't Know". The view features advanced text processing capabilities using Apple's Natural Language framework.
+WordSorterView is a sophisticated word sorting interface for the MacDeepTranscriber app that helps users categorize words from audio transcriptions into three categories: "I Know", "Current Recording", and "Don't Know". The view features advanced text processing capabilities using Apple's Natural Language framework.
 
 ## Core Features
 
@@ -168,7 +168,7 @@ guard cleanWord.count >= 3,
 - **Tokenizer Reuse**: Single tokenizer instance per processing session
 - **Bounded Processing**: Handles large transcriptions efficiently
 
-## Integration with Audio Study App
+## Integration with MacDeepTranscriber App
 
 ### Data Flow
 ```

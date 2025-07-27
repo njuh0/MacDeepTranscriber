@@ -1,4 +1,4 @@
-# Audio Study - macOS Speech Recognition App
+# MacDeepTranscriber - macOS Speech Recognition App
 
 **The application uses only Apple Speech for speech recognition.** The architecture has been simplified to focus on one reliable recognition engine.
 
@@ -23,12 +23,12 @@
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd "Audio Study"
+cd "MacDeepTranscriber"
 ```
 
 2. Open the project in Xcode:
 ```bash
-open "Audio Study.xcodeproj"
+open "MacDeepTranscriber.xcodeproj"
 ```
 
 3. Run the project (⌘+R)
@@ -44,8 +44,8 @@ open "Audio Study.xcodeproj"
 ## Project Structure
 
 ```
-Audio Study/
-├── Audio Study/
+MacDeepTranscriber/
+├── MacDeepTranscriber/
 │   ├── Audio_StudyApp.swift         # Application entry point
 │   ├── ContentView.swift            # Main view
 │   ├── Model/

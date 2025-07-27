@@ -1,12 +1,12 @@
-# Audio Study: Your AI-Powered Language Learning & Transcription Companion for macOS
+# MacDeepTranscriber: Your AI-Powered Language Learning & Transcription Companion for macOS
 
-**Audio Study is a powerful and efficient tool that turns your Mac into a smart audio processing station. Transcribe lectures, online content, or your own voice, and then use integrated AI to analyze, clean, and learn from the text.**
+**MacDeepTranscriber is a powerful and efficient tool that turns your Mac into a smart audio processing station. Transcribe lectures, online content, or your own voice, and then use integrated AI to analyze, clean, and learn from the text.**
 
 ---
 
-## What Can You Do with Audio Study?
+## What Can You Do with MacDeepTranscriber?
 
-Audio Study is designed for a wide range of use cases, from language learning to professional work.
+MacDeepTranscriber is designed for a wide range of use cases, from language learning to professional work.
 
 - **Transcribe Anything**: 
   - **Online Content**: Capture and transcribe audio from YouTube, podcasts, and audiobooks.
@@ -34,7 +34,7 @@ Audio Study is designed for a wide range of use cases, from language learning to
 
 ## The Power of Native Apple Speech
 
-Audio Study is built on Apple's native Speech Recognition framework, which offers significant advantages:
+MacDeepTranscriber is built on Apple's native Speech Recognition framework, which offers significant advantages:
 
 - **Efficiency**: It is incredibly lightweight and consumes minimal RAM compared to other popular models like Whisper MLX. This means you can run it seamlessly in the background without slowing down your Mac.
 - **Speed**: Get real-time transcriptions with very low latency.
@@ -59,7 +59,7 @@ Audio Study is built on Apple's native Speech Recognition framework, which offer
 
 2.  **Open in Xcode:**
     ```bash
-    open "Audio Study.xcodeproj"
+    open "MacDeepTranscriber.xcodeproj"
     ```
 
 3.  **Run the app:** Press `Cmd+R`.

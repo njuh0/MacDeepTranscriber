@@ -1,4 +1,4 @@
-# AI Models Optimization - Audio Study
+# AI Models Optimization - MacDeepTranscriber
 
 ## 🎯 Optimization Goal
 Simplifying the codebase by reducing the number of supported AI models from 4 to 2 most efficient ones.

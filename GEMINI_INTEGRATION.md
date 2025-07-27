@@ -2,7 +2,7 @@
 
 ## 🚀 Новая поддержка Google Gemini 2.0 Flash
 
-Теперь в Audio Study поддерживается новейшая модель Google Gemini 2.0 Flash Experimental! 
+Теперь в MacDeepTranscriber поддерживается новейшая модель Google Gemini 2.0 Flash Experimental! 
 
 ## ✨ Возможности Gemini 2.0 Flash
 

@@ -1,6 +1,6 @@
 //
 //  TranscriptionsView.swift
-//  Audio Study
+//  MacDeepTranscriber
 //
 //  Created on 21.06.2025.
 //
