@@ -92,7 +92,3 @@ Apple's own Speech framework only works through a microphone. Even if you use Bl
 3.  **Run the app:** Press `Cmd+R`.
 
 The easiest project in my life. The app was created 90% with the help of Claude Sonnet 4 Agent
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
